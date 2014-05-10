@@ -7,13 +7,9 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Messages;
 
-
-use Devristo\UdpTorrentTracker\SwarmPeer;
-
-class ScrapeOutput {
-    protected $action = 2;
+class ScrapeResponse extends BaseResponse{
     protected $transactionId;
     protected $connectionId;
 
@@ -35,23 +31,6 @@ class ScrapeOutput {
     public function getCompleted()
     {
         return $this->completed;
-    }
-
-
-    /**
-     * @param int $action
-     */
-    public function setAction($action)
-    {
-        $this->action = $action;
-    }
-
-    /**
-     * @return int
-     */
-    public function getAction()
-    {
-        return $this->action;
     }
 
     /**
@@ -118,21 +97,8 @@ class ScrapeOutput {
         return $this->transactionId;
     }
 
-    public function toBytes(){
-        $header = pack("NN", $this->getAction(), $this->transactionId);
-
-        foreach($this->seeders as $seeders){
-            $header .= pack("N", $seeders);
-        }
-
-        foreach($this->completed as $completed){
-            $header .= pack("N", $completed);
-        }
-
-        foreach($this->leechers as $leechers){
-            $header .= pack("N", $leechers);
-        }
-
-        return $header;
+    public function getMessageType()
+    {
+        return 'scrape';
     }
 }

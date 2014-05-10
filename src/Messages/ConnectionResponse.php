@@ -7,31 +7,11 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Messages;
 
-
-use Devristo\UdpTorrentTracker\Exceptions\ProtocolViolationException;
-
-class ConnectionOutput {
-    protected $action = 0;
+class ConnectionResponse extends BaseResponse{
     protected $transactionId;
     protected $connectionId;
-
-    /**
-     * @param mixed $action
-     */
-    public function setAction($action)
-    {
-        $this->action = $action;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getAction()
-    {
-        return $this->action;
-    }
 
     /**
      * @param mixed $connectionId
@@ -69,7 +49,8 @@ class ConnectionOutput {
         return $this->connectionId == ("000041727101980");
     }
 
-    public function toBytes(){
-        return pack("NN", $this->getAction(), $this->getTransactionId()).hex2bin($this->getConnectionId());
+    public function getMessageType()
+    {
+        return 'connect';
     }
 }

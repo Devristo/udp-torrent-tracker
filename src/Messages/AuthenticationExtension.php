@@ -7,7 +7,7 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Messages;
 
 
 class AuthenticationExtension {

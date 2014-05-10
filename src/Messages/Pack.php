@@ -7,7 +7,7 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Messages;
 
 define('BIG_ENDIAN', pack('L', 1) === pack('N', 1));
 

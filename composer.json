@@ -9,14 +9,20 @@
         }
     ],
     "autoload": {
-        "psr-0": {
-            "Devristo\\UdpTorrentTracker\\": "src/"
+        "psr-4": {
+            "Devristo\\TorrentTracker\\": "src/"
         }
     },
     "target-dir": "",
     "require": {
-        "zendframework/zend-math": "2.*",
-        "zendframework/zend-eventmanager": "2.*",
-        "zendframework/zend-log": "2.*"
+        "psr/log": "v1.0.0",
+        "clue/datagram": "dev-master",
+        "react/react": "<0.4"
+    },
+    "require-dev": {
+        "monolog/monolog": "v1.9.1",
+        "phpunit/phpunit": "3.7.*",
+        "akamon/mockery-callable-mock": "dev-master",
+        "mockery/mockery": "0.9.*@dev"
     }
 }

@@ -7,7 +7,7 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Exceptions;
+namespace Devristo\TorrentTracker\Exceptions;
 
 
 class ProtocolViolationException extends \InvalidArgumentException {

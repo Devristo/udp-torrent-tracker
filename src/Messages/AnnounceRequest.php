@@ -7,15 +7,13 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\UdpTorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Messages;
 
-
-use Devristo\UdpTorrentTracker\Messages\Input;
-use Devristo\UdpTorrentTracker\Exceptions\ProtocolViolationException;
-use Zend\Math\BigInteger\BigInteger;
-
-class AnnounceInput extends Input{
-
+class AnnounceRequest extends Request{
+    const EVENT_NONE = 0;
+    const EVENT_COMPLETED = 1;
+    const EVENT_STARTED = 2;
+    const EVENT_STOPPED = 3;
 
     protected $infoHash;
     protected $peerId;
@@ -31,7 +29,7 @@ class AnnounceInput extends Input{
 
     protected $credentials = null;
 
-    protected function setEvent($event){
+    public function setEvent($event){
         $this->event = $event;
     }
 
@@ -228,117 +226,11 @@ class AnnounceInput extends Input{
         return $this->connectionId;
     }
 
-    /**
-     * @param mixed $transactionId
-     */
-    public function setTransactionId($transactionId)
-    {
-        $this->transactionId = $transactionId;
+    public function setRequestString($value){
+        $this->requestString = $value;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getTransactionId()
-    {
-        return $this->transactionId;
-    }
-
-    /**
-     * @param mixed $action
-     */
-    public function setAction($action)
-    {
-        $this->action = $action;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getAction()
-    {
-        return $this->action;
-    }
-
-    public static function fromUdpPacket($peerIp, $peerPort, $data){
-        if(strlen($data) < 20)
-            throw new ProtocolViolationException("Data packet should be at least 20 bytes long");
-
-        $offset = 0;
-        $connectionId = substr($data, $offset, 8);
-        $offset += 8;
-
-        $struct = unpack("Naction/NtransactionId", substr($data, $offset, 8));
-
-        $action = $struct['action'];
-        $transactionId = $struct['transactionId'];
-        $offset += 8;
-
-        $infoHash = substr($data, $offset, 20);
-        $offset += 20;
-
-        $peerId = substr($data, $offset, 20);
-        $offset += 20;
-
-        $downloaded = Pack::unpack_int64be(substr($data, $offset, 8));
-        $offset += 8;
-
-        $left = Pack::unpack_int64be(substr($data, $offset, 8));
-        $offset += 8;
-
-        $uploaded = Pack::unpack_int64be(substr($data, $offset, 8));
-        $offset += 8;
-
-        list(,$event) = Pack::unpack_int32be(substr($data, $offset, 4)); $offset += 4;
-        list(,$ipv4) = unpack("N", substr($data, $offset, 4)); $offset += 4;
-        $ipv4 = long2ip($ipv4);
-
-
-        list(,$key) = unpack("N", substr($data, $offset, 4)); $offset += 4;
-        $numWant = Pack::unpack_int32be(substr($data, $offset, 4)); $offset += 4;
-
-        list($port) = array_values(unpack("n", substr($data, $offset, 2)));
-        $offset += 2;
-
-        $o = new self();
-
-        $o->setConnectionId(bin2hex($connectionId));
-        $o->setAction($action);
-        $o->setTransactionId($transactionId);
-
-        $o->setInfoHash(($infoHash));
-        $o->setPeerId($peerId);
-        $o->setDownloaded($downloaded);
-        $o->setLeft($left);
-        $o->setUploaded($uploaded);
-        $o->setEvent($event);
-        $o->setIpv4($ipv4);
-        $o->setkey($key);
-        $o->setNumWant($numWant);
-        $o->setPort($port);
-
-        $o->peerIp = $peerIp;
-        $o->peerPort = $peerPort;
-
-        if($o->ipv4 === 0){
-            $o->ipv4 = $peerIp;
-        }
-
-        # We have extensions
-        if($offset + 1 <= strlen($data)){
-            list($extensions) = array_values(unpack("C", substr($data, $offset,1)));
-            $offset += 1;
-
-            if(($extensions & 1) == 1)
-                $o->credentials = AuthenticationExtension::fromBytes($data, $offset);
-
-            if(($extensions & 2) == 2)
-                $o->requestString = RequestStringExtension::fromBytes($data, $offset)->getRequestString();
-        }
-
-        if($action !== 1)
-            throw new ProtocolViolationException("Action should be 1 for a ANNOUNCE INPUT");
-
-        return $o;
+    public function setCredentials(AuthenticationExtension $credentials){
+        $this->credentials = $credentials;
     }
 }
