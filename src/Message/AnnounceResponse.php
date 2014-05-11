@@ -7,10 +7,10 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Message;
 
 
-class AnnounceResponse extends BaseResponse {
+class AnnounceResponse extends TrackerResponse {
     /**
      * @var \Devristo\TorrentTracker\Model\SwarmPeer[]
      */

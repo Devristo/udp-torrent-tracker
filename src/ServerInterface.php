@@ -8,8 +8,8 @@
 namespace Devristo\TorrentTracker;
 
 
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
-use Devristo\TorrentTracker\Messages\ScrapeRequest;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Evenement\EventEmitterInterface;
 use React\EventLoop\LoopInterface;
 

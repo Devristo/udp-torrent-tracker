@@ -9,7 +9,7 @@
 namespace Devristo\TorrentTracker\Model;
 
 
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
 
 class ArrayRepository implements TorrentRepositoryInterface{
     /**
@@ -85,5 +85,20 @@ class ArrayRepository implements TorrentRepositoryInterface{
 
     public function trackTorrent(TorrentInterface $torrent){
         $this->torrents[$torrent->getInfoHash()] = $torrent;
+    }
+
+    public function startPeer(AnnounceRequest $input)
+    {
+        // TODO: Implement startPeer() method.
+    }
+
+    public function completePeer(AnnounceRequest $input)
+    {
+        // TODO: Implement completePeer() method.
+    }
+
+    public function stopPeer(AnnounceRequest $input)
+    {
+        // TODO: Implement stopPeer() method.
     }
 }

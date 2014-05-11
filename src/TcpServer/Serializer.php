@@ -10,15 +10,16 @@ namespace Devristo\TorrentTracker\TcpServer;
 
 
 use Devristo\Torrent\Bee;
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
-use Devristo\TorrentTracker\Messages\AnnounceResponse;
-use Devristo\TorrentTracker\Messages\BaseResponse;
-use Devristo\TorrentTracker\Messages\BaseRequest;
-use Devristo\TorrentTracker\Messages\ErrorResponse;
-use Devristo\TorrentTracker\Messages\ScrapeRequest;
-use Devristo\TorrentTracker\Messages\ScrapeResponse;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceResponse;
+use Devristo\TorrentTracker\Message\TrackerResponse;
+use Devristo\TorrentTracker\Message\TrackerRequest;
+use Devristo\TorrentTracker\Message\ErrorResponse;
+use Devristo\TorrentTracker\Message\ScrapeRequest;
+use Devristo\TorrentTracker\Message\ScrapeResponse;
 use Devristo\TorrentTracker\Model\SwarmPeer;
-use React\Http\Request as HttpRequest;
+use Guzzle\Http\Message\Request;
+
 use Symfony\Component\Routing\Matcher\UrlMatcher;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\Route;
@@ -50,19 +51,19 @@ class Serializer {
     }
 
     /**
-     * @param BaseResponse $response
+     * @param TrackerResponse $response
      * @return string
      */
-    public function encode(BaseResponse $response){
+    public function encode(TrackerResponse $response){
         $handler = $this->encodeHandlers[$response->getMessageType()];
         return call_user_func($handler, $response);
     }
 
     /**
-     * @param HttpRequest $httpRequest
-     * @return BaseRequest
+     * @param Request $httpRequest
+     * @return TrackerRequest
      */
-    public function decode(HttpRequest $httpRequest){
+    public function decode(Request $httpRequest){
         $context = new RequestContext();
         $context->setMethod($httpRequest->getMethod());
         $matcher = new UrlMatcher($this->routes, $context);
@@ -73,7 +74,7 @@ class Serializer {
         return call_user_func($handler, $httpRequest);
     }
 
-    public function decodeAnnounce(HttpRequest $httpRequest){
+    public function decodeAnnounce(Request $httpRequest){
         $eventMap = array(
             "started" => AnnounceRequest::EVENT_STARTED,
             "stopped" => AnnounceRequest::EVENT_STOPPED,
@@ -90,8 +91,10 @@ class Serializer {
         $announce->setUploaded($query['uploaded']);
         $announce->setDownloaded($query['downloaded']);
         $announce->setLeft($query['left']);
+        $announce->setRequestString($httpRequest->getResource());
 
-        $eventKey = array_key_exists('event', $query) && array_key_exists($query['event'], $eventMap) ? $query['event'] : null;
+        $eventKey = array_key_exists('event', $query) && array_key_exists($query['event'], $eventMap)
+            ? $query['event'] : null;
         $announce->setEvent($eventMap[$eventKey]);
 
         if(array_key_exists('ip', $query))
@@ -106,8 +109,11 @@ class Serializer {
         return $announce;
     }
 
-    public function decodeScrape(HttpRequest $httpRequest){
+    public function decodeScrape(Request $httpRequest){
         $hashes = $httpRequest->getQuery()['info_hash'];
+
+        if (is_string($hashes))
+            $hashes = array($hashes);
 
         $scrape = new ScrapeRequest();
         $scrape->setInfoHashes($hashes);
@@ -115,7 +121,17 @@ class Serializer {
     }
 
     public function encodeScrape(ScrapeResponse $scrape){
-        return '';
+        return $this->bee->encode(array(
+            'files' => array_map(function($infoHash) use ($scrape){
+                $stats = $scrape->getStats()[$infoHash];
+
+                return array(
+                    'complete' => $stats['complete'],
+                    'downloaded' => $stats['downloaded'],
+                    'incomplete' => $stats['incomplete']
+                );
+            }, $scrape->getRequest()->getInfoHashes())
+        ));
     }
 
     public function encodeAnnounce(AnnounceResponse $announce){
@@ -136,7 +152,7 @@ class Serializer {
 
     public function encodeError(ErrorResponse $error){
         return $this->bee->encode(array(
-            'failure reason' => $error->getMessageType()
+            'failure reason' => $error->getMessage()
         ));
     }
 } 

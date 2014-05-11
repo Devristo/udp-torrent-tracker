@@ -1,7 +1,6 @@
 {
     "name": "devristo/udp-torrent-tracker",
     "description": "Generic torrent tracker, easily integrated in custom environments.",
-    "minimum-stability": "stable",
     "authors": [
         {
             "name": "Devristo",
@@ -25,7 +24,8 @@
         "clue/datagram": "dev-master",
         "react/react": "<0.4",
         "symfony/routing": "2.4.*",
-        "devristo/torrent": "dev-master"
+        "devristo/torrent": "dev-master",
+        "cboden/ratchet": "v0.3.0"
     },
     "require-dev": {
         "monolog/monolog": "v1.9.1",

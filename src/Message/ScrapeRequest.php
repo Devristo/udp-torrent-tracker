@@ -7,13 +7,10 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Message;
 
 
-use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
-use Devristo\TorrentTracker\Messages\BaseRequest;
-
-class ScrapeRequest extends BaseRequest {
+class ScrapeRequest extends TrackerRequest {
     protected $infoHashes = array();
 
     public function getInfoHashes(){
@@ -23,5 +20,9 @@ class ScrapeRequest extends BaseRequest {
     public function setInfoHashes(array $infoHashes)
     {
         $this->infoHashes = $infoHashes;
+    }
+
+    public function getMessageType(){
+        return 'scrape';
     }
 }

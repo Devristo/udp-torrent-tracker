@@ -8,7 +8,7 @@
 
 namespace Devristo\TorrentTracker\Model;
 
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
 
 interface TorrentRepositoryInterface {
     public function getByInfoHash($infoHash);
@@ -25,7 +25,13 @@ interface TorrentRepositoryInterface {
      */
     public function getLeechers($infoHash);
 
+    public function startPeer(AnnounceRequest $input);
+
     public function updatePeer(AnnounceRequest $input);
+
+    public function completePeer(AnnounceRequest $input);
+
+    public function stopPeer(AnnounceRequest $input);
 
     public function trackTorrent(TorrentInterface $torrent);
 }

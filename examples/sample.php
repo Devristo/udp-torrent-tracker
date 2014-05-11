@@ -29,4 +29,9 @@ $tracker = new Tracker($logger, $repository);
 $tracker->bind($udpServer);
 $tracker->bind($tcpServer);
 
+
+$tracker->on('announce', function(\Devristo\TorrentTracker\TrackerEvent $event){
+
+});
+
 $loop->run();

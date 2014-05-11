@@ -2,14 +2,17 @@
 /**
  * Created by PhpStorm.
  * User: Chris
- * Date: 8-5-2014
- * Time: 21:31
+ * Date: 11-5-2014
+ * Time: 18:50
  */
 
 namespace Devristo\TorrentTracker;
 
 
-class Session {
+use Devristo\TorrentTracker\Message\TrackerRequest;
+
+class TrackerEvent {
+    protected $request;
     protected $error;
     protected $canceled = false;
 
@@ -25,5 +28,9 @@ class Session {
     public function getError()
     {
         return $this->error;
+    }
+
+    public function __construct(TrackerRequest $request){
+        $this->request = $request;
     }
 } 

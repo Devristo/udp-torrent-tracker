@@ -10,18 +10,18 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 
 use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
-use Devristo\TorrentTracker\Messages\AnnounceResponse;
-use Devristo\TorrentTracker\Messages\AuthenticationExtension;
-use Devristo\TorrentTracker\Messages\BaseResponse;
-use Devristo\TorrentTracker\Messages\ConnectionRequest;
-use Devristo\TorrentTracker\Messages\ConnectionResponse;
-use Devristo\TorrentTracker\Messages\ErrorResponse;
-use Devristo\TorrentTracker\Messages\Pack;
-use Devristo\TorrentTracker\Messages\BaseRequest;
-use Devristo\TorrentTracker\Messages\RequestStringExtension;
-use Devristo\TorrentTracker\Messages\ScrapeRequest;
-use Devristo\TorrentTracker\Messages\ScrapeResponse;
+use Devristo\TorrentTracker\Message\AnnounceResponse;
+use Devristo\TorrentTracker\Message\AuthenticationExtension;
+use Devristo\TorrentTracker\Message\TrackerResponse;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
+use Devristo\TorrentTracker\Message\ErrorResponse;
+use Devristo\TorrentTracker\Message\Pack;
+use Devristo\TorrentTracker\Message\TrackerRequest;
+use Devristo\TorrentTracker\Message\RequestStringExtension;
+use Devristo\TorrentTracker\Message\ScrapeResponse;
+use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpScrapeRequest;
 
 class Serializer {
     const PACKET_TYPE_CONNECT = 0;
@@ -30,7 +30,7 @@ class Serializer {
 
     /**
      * @param $data
-     * @return BaseRequest
+     * @return TrackerRequest
      */
     public function decode($data){
         if (strlen($data) < 16)
@@ -91,7 +91,7 @@ class Serializer {
         list($port) = array_values(unpack("n", substr($data, $offset, 2)));
         $offset += 2;
 
-        $o = new AnnounceRequest();
+        $o = new UdpAnnounceRequest();
 
         $o->setConnectionId(bin2hex($connectionId));
         $o->setTransactionId($transactionId);
@@ -130,7 +130,7 @@ class Serializer {
         if(strlen($data) < 16)
             throw new ProtocolViolationException("Data packet should be at least 16 bytes long");
 
-        $o = new ConnectionRequest();
+        $o = new UdpConnectionRequest();
 
         $offset = 0;
         $connectionId = substr($data, $offset, 8);
@@ -164,7 +164,7 @@ class Serializer {
         $transactionId = substr($data, $offset, 4);
         $offset +=4;
 
-        $o = new ScrapeRequest();
+        $o = new UdpScrapeRequest();
 
         $o->setConnectionId(bin2hex($connectionId));
         $o->setTransactionId(bin2hex($transactionId));
@@ -184,7 +184,7 @@ class Serializer {
         return $o;
     }
 
-    public function encode(BaseResponse $response){
+    public function encode(TrackerResponse $response){
         $encoders = array(
             "announce" => array($this, 'encodeAnnounce'),
             "connect" => array($this, 'encodeConnect'),
@@ -200,22 +200,18 @@ class Serializer {
     public function encodeScrape(ScrapeResponse $response){
         $header = pack("NN", 2, $response->getRequest()->getTransactionId());
 
-        foreach($response->getSeeders() as $seeders){
-            $header .= pack("N", $seeders);
-        }
+        // Take order of request, this is important!
+        foreach($response->getRequest()->getInfoHashes() as $infohash){
+            $stats = $response->getStats()[$infohash];
 
-        foreach($response->getCompleted() as $completed){
-            $header .= pack("N", $completed);
+            $header .= pack("N", $stats['complete']);
+            $header .= pack("N", $stats['downloaded']);
+            $header .= pack("N", $stats['incomplete']);
         }
-
-        foreach($response->getLeechers() as $leechers){
-            $header .= pack("N", $leechers);
-        }
-
         return $header;
     }
 
-    public function encodeConnect(ConnectionResponse $response){
+    public function encodeConnect(UdpConnectionResponse $response){
         return pack("NN", 0, $response->getRequest()->getTransactionId()).hex2bin($response->getConnectionId());
     }
 

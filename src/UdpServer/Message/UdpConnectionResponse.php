@@ -7,9 +7,11 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\UdpServer\Message;
 
-class ConnectionResponse extends BaseResponse{
+use Devristo\TorrentTracker\Message\TrackerResponse;
+
+class UdpConnectionResponse extends TrackerResponse{
     protected $transactionId;
     protected $connectionId;
 

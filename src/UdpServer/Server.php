@@ -11,14 +11,15 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 use Datagram\Factory as DatagramFactory;
 use Datagram\Socket;
-use Devristo\TorrentTracker\Messages\BaseResponse;
+use Devristo\TorrentTracker\Exceptions\TrackerException;
+use Devristo\TorrentTracker\Message\TrackerResponse;
 use Devristo\TorrentTracker\Model\Endpoint;
 use Devristo\TorrentTracker\ServerInterface;
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
-use Devristo\TorrentTracker\Messages\ConnectionRequest;
-use Devristo\TorrentTracker\Messages\ConnectionResponse;
-use Devristo\TorrentTracker\Messages\ErrorResponse;
-use Devristo\TorrentTracker\Messages\ScrapeRequest;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
+use Devristo\TorrentTracker\Message\ErrorResponse;
+use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Evenement\EventEmitter;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\LoopInterface;
@@ -59,20 +60,31 @@ class Server extends EventEmitter implements ServerInterface
             $server->on("message", function($buf, $address){
                 try{
                     $this->acceptMessage($buf, $address)->then(
-                        function(BaseResponse $response){
+                        function(TrackerResponse $response){
                             $this->logger->notice("Sending response", array(
                                 'type' => $response->getMessageType(),
                                 'address' => $response->getRequest()->getRequestEndpoint()->toString()
                             ));
                             $this->send($response);
-                        }, function (ErrorResponse $response){
-                            $this->send($response);
-                            $this->logger->error($response->getMessage(), array(
-                                'address' => $response->getRequest()->getRequestEndpoint()->toString()
+                        }, function (\Exception $e) use ($address){
+
+                            if($e instanceof TrackerException) {
+                                $trackerResponse = new ErrorResponse($e->getRequest(), $e->getMessage());
+                                $this->send($trackerResponse);
+                            }
+
+                            $this->logger->error($e->getMessage(), array(
+                                'exception' => $e,
+                                'address' => $address
                             ));
                         }
                     );
                 } catch(\Exception $exception){
+                    $this->logger->error('Unhandled exception', array(
+                        'exception' => $exception,
+                        'address' => $address
+                    ));
+
                     $this->emit("exception", array($this, $exception));
                 }
             });
@@ -80,17 +92,17 @@ class Server extends EventEmitter implements ServerInterface
     }
 
     /**
-     * @param ConnectionRequest $in
+     * @param UdpConnectionRequest $in
      * @return DeferredPromise
      */
-    public function connect(ConnectionRequest $in){
+    public function connect(UdpConnectionRequest $in){
         do{
             $connectionId = bin2hex(pack("NN",rand(0,2000000000),rand(0,2000000000)));
         } while(array_key_exists($connectionId, $this->_connections));
 
         $this->_connections[$connectionId] = new Connection($connectionId, new DateTime());
 
-        $reply = new ConnectionResponse($in);
+        $reply = new UdpConnectionResponse($in);
         $reply->setConnectionId($connectionId);
         $reply->setTransactionId($in->getTransactionId());
 
@@ -106,16 +118,13 @@ class Server extends EventEmitter implements ServerInterface
         $deferred = new Deferred();
 
         if(!array_key_exists($announce->getConnectionId(), $this->_connections)){
-            $deferred->reject(new ErrorResponse($announce, "Client not connected"));
+            $deferred->reject(new TrackerException($announce,"Client not connected"));
             return $deferred->promise();
         }
 
         # Use announce address if no peer address given
         if(!$announce->getIpv4())
             $announce->setIpv4($announce->getRequestEndpoint()->getIp());
-
-        if(!$announce->getPort())
-            $announce->setPort($announce->getRequestEndpoint()->getPort());
 
         # Heartbeat
         $this->_connections[$announce->getConnectionId()]->setLastHeartbeat(new DateTime());
@@ -130,7 +139,7 @@ class Server extends EventEmitter implements ServerInterface
         $deferred = new Deferred();
 
         if(!array_key_exists($scrape->getConnectionId(), $this->_connections)){
-            $deferred->reject(new ErrorResponse($scrape, "Client not connected"));
+            $deferred->reject(new TrackerException($scrape, "Client not connected"));
             return $deferred->promise();
         }
 
@@ -149,9 +158,9 @@ class Server extends EventEmitter implements ServerInterface
         $inputPacket->setRequestEndpoint($endpoint);
 
         $promise = new Deferred();
-        $promise->reject(new ErrorResponse($inputPacket, "Unknown request"));
+        $promise->reject(new TrackerException($inputPacket, "Unknown request"));
 
-        if($inputPacket instanceof ConnectionRequest)
+        if($inputPacket instanceof UdpConnectionRequest)
             $promise = $this->connect($inputPacket);
         elseif($inputPacket instanceof AnnounceRequest)
             $promise = $this->announce($inputPacket);
@@ -164,7 +173,7 @@ class Server extends EventEmitter implements ServerInterface
         return $promise;
     }
 
-    protected function send(BaseResponse $response){
+    protected function send(TrackerResponse $response){
         $address = $response->getRequest()->getRequestEndpoint()->toString();
         $buff = $this->serializer->encode($response);
         $this->socket->send($buff, $address);

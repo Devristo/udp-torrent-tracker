@@ -10,7 +10,7 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
 use Devristo\TorrentTracker\Messages\ConnectionRequest;
 use Devristo\TorrentTracker\Messages\ConnectionResponse;
 use Devristo\TorrentTracker\Model\Endpoint;
@@ -40,7 +40,7 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function test_announce_without_connect(){
-        $request = new AnnounceRequest();
+        $request = new UdpAnnounceRequest();
         $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
 
         $onAnnounce = new MockeryCallableMock();
@@ -71,7 +71,7 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
         $this->server->on("connect", $onConnect);
         $this->server->connect($connectRequest)->then(function(ConnectionResponse $response) use($onResponse){
             $this->assertInstanceOf(ConnectionResponse::class, $response);
-            $request = new AnnounceRequest();
+            $request = new UdpAnnounceRequest();
             $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
             $request->setTransactionId('bbbb');
             $request->setConnectionId($response->getConnectionId());

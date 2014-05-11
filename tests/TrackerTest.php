@@ -15,7 +15,7 @@ use Devristo\TorrentTracker\Model\Endpoint;
 use Devristo\TorrentTracker\Model\SwarmPeer;
 use Devristo\TorrentTracker\Model\Torrent;
 use Devristo\TorrentTracker\Model\TorrentRepositoryInterface;
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
 use Devristo\TorrentTracker\Messages\AnnounceResponse;
 use Devristo\TorrentTracker\Messages\ConnectionRequest;
 use Devristo\TorrentTracker\Messages\ConnectionResponse;
@@ -74,7 +74,7 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
 
         $this->udpServer->connect($connectRequest)->then(function(ConnectionResponse $response) use($infohash) {
 
-            $request = new AnnounceRequest();
+            $request = new UdpAnnounceRequest();
             $request->setInfoHash($infohash);
             $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
             $request->setTransactionId('bbbb');
@@ -98,7 +98,7 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
 
         $this->udpServer->connect($connectRequest)->then(function(ConnectionResponse $response) use($infohash){
 
-            $request = new AnnounceRequest();
+            $request = new UdpAnnounceRequest();
             $request->setInfoHash($infohash);
             $request->setPeerId("A");
             $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:81"));

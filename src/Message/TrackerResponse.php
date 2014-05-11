@@ -6,18 +6,18 @@
  * Time: 13:25
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Message;
 
 
-abstract class BaseResponse {
+abstract class TrackerResponse {
     protected $request;
 
-    public function __construct(BaseRequest $request)
+    public function __construct(TrackerRequest $request)
     {
         $this->request = $request;
     }
     /**
-     * @return BaseRequest
+     * @return TrackerRequest
      */
     public function getRequest()
     {
@@ -25,7 +25,7 @@ abstract class BaseResponse {
     }
 
     /**
-     * @param BaseRequest $request
+     * @param TrackerRequest $request
      */
     public function setRequest($request)
     {

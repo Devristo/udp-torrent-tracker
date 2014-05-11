@@ -8,7 +8,7 @@
 
 namespace Devristo\TorrentTracker\UdpServer;
 
-use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
 use Devristo\TorrentTracker\Messages\AnnounceResponse;
 use Devristo\TorrentTracker\Messages\ConnectionRequest;
 use Devristo\TorrentTracker\Messages\ConnectionResponse;
@@ -49,7 +49,7 @@ class ConversionTest extends \PHPUnit_Framework_TestCase
         $announce_raw = hex2bin("e65e7e630f50b38a00000001be4420316a36de201df2f1b2c817474c3075ff0eaa8c77852d7142333042302d4371463573297537796b36280000000000000000000000002a00000000000000000000000000000200000000a0ad9d43000000c81ae102092f616e6e6f756e6365");
         $announce = $this->conversion->decode($announce_raw);
 
-        $this->assertInstanceOf(AnnounceRequest::class, $announce);
+        $this->assertInstanceOf(UdpAnnounceRequest::class, $announce);
 
         # Test whether we parsed the announce correctly
         $this->assertEquals("6a36de201df2f1b2c817474c3075ff0eaa8c7785", bin2hex($announce->getInfoHash()));

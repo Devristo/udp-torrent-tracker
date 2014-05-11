@@ -7,15 +7,15 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Message;
 
 
-class ErrorResponse extends BaseResponse {
+class ErrorResponse extends TrackerResponse {
     protected $action = 3;
 
     protected $message;
 
-    public function __construct(BaseRequest $request, $message){
+    public function __construct(TrackerRequest $request, $message){
         parent::__construct($request);
         $this->setMessage($message);
     }

@@ -7,9 +7,9 @@
  * To change this template use File | Settings | File Templates.
  */
 
-namespace Devristo\TorrentTracker\Messages;
+namespace Devristo\TorrentTracker\Message;
 
-class AnnounceRequest extends BaseRequest{
+class AnnounceRequest extends TrackerRequest{
     const EVENT_NONE = 0;
     const EVENT_COMPLETED = 1;
     const EVENT_STARTED = 2;
@@ -208,22 +208,6 @@ class AnnounceRequest extends BaseRequest{
     public function getUploaded()
     {
         return $this->uploaded;
-    }
-
-    /**
-     * @param mixed $connectionId
-     */
-    public function setConnectionId($connectionId)
-    {
-        $this->connectionId = $connectionId;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getConnectionId()
-    {
-        return $this->connectionId;
     }
 
     public function setRequestString($value){
