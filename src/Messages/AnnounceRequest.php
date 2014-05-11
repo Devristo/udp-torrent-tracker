@@ -9,7 +9,7 @@
 
 namespace Devristo\TorrentTracker\Messages;
 
-class AnnounceRequest extends Request{
+class AnnounceRequest extends BaseRequest{
     const EVENT_NONE = 0;
     const EVENT_COMPLETED = 1;
     const EVENT_STARTED = 2;
@@ -232,5 +232,9 @@ class AnnounceRequest extends Request{
 
     public function setCredentials(AuthenticationExtension $credentials){
         $this->credentials = $credentials;
+    }
+
+    public function getMessageType(){
+        return 'announce';
     }
 }

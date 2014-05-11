@@ -15,7 +15,7 @@ class ErrorResponse extends BaseResponse {
 
     protected $message;
 
-    public function __construct(Request $request, $message){
+    public function __construct(BaseRequest $request, $message){
         parent::__construct($request);
         $this->setMessage($message);
     }

@@ -7,10 +7,17 @@
  */
 namespace Devristo\TorrentTracker;
 
+
+use Devristo\TorrentTracker\Messages\AnnounceRequest;
+use Devristo\TorrentTracker\Messages\ScrapeRequest;
 use Evenement\EventEmitterInterface;
 use React\EventLoop\LoopInterface;
 
 interface ServerInterface extends EventEmitterInterface
 {
-    public function bind(LoopInterface $eventLoop);
+    public function bind(LoopInterface $eventLoop, $bindAddress = "0.0.0.0:6881");
+
+    public function announce(AnnounceRequest $announce);
+
+    public function scrape(ScrapeRequest $scrape);
 }

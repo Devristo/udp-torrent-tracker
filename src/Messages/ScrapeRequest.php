@@ -11,9 +11,9 @@ namespace Devristo\TorrentTracker\Messages;
 
 
 use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
-use Devristo\TorrentTracker\Messages\Request;
+use Devristo\TorrentTracker\Messages\BaseRequest;
 
-class ScrapeRequest extends Request {
+class ScrapeRequest extends BaseRequest {
     protected $infoHashes = array();
 
     public function getInfoHashes(){

@@ -18,7 +18,7 @@ use Devristo\TorrentTracker\Messages\ConnectionRequest;
 use Devristo\TorrentTracker\Messages\ConnectionResponse;
 use Devristo\TorrentTracker\Messages\ErrorResponse;
 use Devristo\TorrentTracker\Messages\Pack;
-use Devristo\TorrentTracker\Messages\Request;
+use Devristo\TorrentTracker\Messages\BaseRequest;
 use Devristo\TorrentTracker\Messages\RequestStringExtension;
 use Devristo\TorrentTracker\Messages\ScrapeRequest;
 use Devristo\TorrentTracker\Messages\ScrapeResponse;
@@ -30,7 +30,7 @@ class Serializer {
 
     /**
      * @param $data
-     * @return Request
+     * @return BaseRequest
      */
     public function decode($data){
         if (strlen($data) < 16)

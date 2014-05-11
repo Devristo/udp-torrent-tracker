@@ -10,9 +10,9 @@
 namespace Devristo\TorrentTracker\Messages;
 
 
-use Devristo\TorrentTracker\Messages\Request;
+use Devristo\TorrentTracker\Messages\BaseRequest;
 use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
 
-class ConnectionRequest extends Request{
+class ConnectionRequest extends BaseRequest{
 
 }

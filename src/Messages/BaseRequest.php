@@ -12,7 +12,7 @@ namespace Devristo\TorrentTracker\Messages;
 
 use Devristo\TorrentTracker\Model\Endpoint;
 
-abstract class Request
+abstract class BaseRequest
 {
     const MESSAGE_TYPE_CONNECT = "connect";
     const MESSAGE_TYPE_ANNOUNCE = "announce";

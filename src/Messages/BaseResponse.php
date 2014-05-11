@@ -12,12 +12,12 @@ namespace Devristo\TorrentTracker\Messages;
 abstract class BaseResponse {
     protected $request;
 
-    public function __construct(Request $request)
+    public function __construct(BaseRequest $request)
     {
         $this->request = $request;
     }
     /**
-     * @return Request
+     * @return BaseRequest
      */
     public function getRequest()
     {
@@ -25,7 +25,7 @@ abstract class BaseResponse {
     }
 
     /**
-     * @param Request $request
+     * @param BaseRequest $request
      */
     public function setRequest($request)
     {

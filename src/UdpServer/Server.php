@@ -136,7 +136,7 @@ class Server extends EventEmitter implements ServerInterface
 
         # Heartbeat
         $this->_connections[$scrape->getConnectionId()]->setLastHeartbeat(new DateTime());
-        $this->emit("scrape", array($this, $scrape));
+        $this->emit("scrape", array($this, $scrape, $deferred));
 
         return $deferred->promise();
     }
