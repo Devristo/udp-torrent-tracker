@@ -126,6 +126,9 @@ class Server extends EventEmitter implements ServerInterface
         if(!$announce->getIpv4())
             $announce->setIpv4($announce->getRequestEndpoint()->getIp());
 
+        if(!$announce->getPort())
+            $announce->setPort($announce->getRequestEndpoint()->getPort());
+
         # Heartbeat
         $this->_connections[$announce->getConnectionId()]->setLastHeartbeat(new DateTime());
 

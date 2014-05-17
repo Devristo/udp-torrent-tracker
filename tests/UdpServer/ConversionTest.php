@@ -8,11 +8,11 @@
 
 namespace Devristo\TorrentTracker\UdpServer;
 
-use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
-use Devristo\TorrentTracker\Messages\AnnounceResponse;
-use Devristo\TorrentTracker\Messages\ConnectionRequest;
-use Devristo\TorrentTracker\Messages\ConnectionResponse;
+use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Model\SwarmPeer;
+use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
 
 class ConversionTest extends \PHPUnit_Framework_TestCase
 {
@@ -35,10 +35,10 @@ class ConversionTest extends \PHPUnit_Framework_TestCase
         # Opening CONNECT handshake sent by CLIENT
         $connect_raw = hex2bin("0000041727101980000000006b61e6f3");
         $connect = $this->conversion->decode($connect_raw);
-        $this->assertInstanceOf(ConnectionRequest::class, $connect);
+        $this->assertInstanceOf(UdpConnectionRequest::class, $connect);
 
         # Response by SERVER
-        $connect_response = new ConnectionResponse($connect);
+        $connect_response = new UdpConnectionResponse($connect);
         $connect_response->setConnectionId("e65e7e630f50b38a");
         $connect_response->setTransactionId($connect->getTransactionId());
 

@@ -9,10 +9,7 @@
 namespace Devristo\TorrentTracker;
 
 
-use Devristo\TorrentTracker\Message\TrackerRequest;
-
 class TrackerEvent {
-    protected $request;
     protected $error;
     protected $canceled = false;
 
@@ -28,9 +25,5 @@ class TrackerEvent {
     public function getError()
     {
         return $this->error;
-    }
-
-    public function __construct(TrackerRequest $request){
-        $this->request = $request;
     }
 } 

@@ -10,24 +10,26 @@ namespace Devristo\TorrentTracker;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
-use Devristo\TorrentTracker\Model\ArrayRepository;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceResponse;
+use Devristo\TorrentTracker\Model\AnnounceDifference;
+use Devristo\TorrentTracker\Repository\ArrayRepository;
 use Devristo\TorrentTracker\Model\Endpoint;
 use Devristo\TorrentTracker\Model\SwarmPeer;
 use Devristo\TorrentTracker\Model\Torrent;
-use Devristo\TorrentTracker\Model\TorrentRepositoryInterface;
-use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
-use Devristo\TorrentTracker\Messages\AnnounceResponse;
-use Devristo\TorrentTracker\Messages\ConnectionRequest;
-use Devristo\TorrentTracker\Messages\ConnectionResponse;
+use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
 use Devristo\TorrentTracker\UdpServer\Server;
 use Mockery\Matcher\Closure;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\Factory;
 use React\EventLoop\LoopInterface;
+use React\Promise\Deferred;
 
 class TrackerTest extends \PHPUnit_Framework_TestCase {
-    /** @var TorrentRepositoryInterface */
+    /** @var \Devristo\TorrentTracker\Repository\TorrentRepositoryInterface */
     protected $repository;
 
     /** @var  Tracker */
@@ -58,6 +60,45 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         $this->tracker->bind($this->udpServer);
     }
 
+    private function create_announce($downloaded, $uploaded, $peerId=null, $infoHash=null){
+        $infoHash = $infoHash ?: str_repeat("\0", 20);
+        $peerId = $peerId ?: str_repeat('a', 20);
+
+        $announce = new AnnounceRequest();
+        $announce->setInfoHash($infoHash);
+        $announce->setPeerId($peerId);
+        $announce->setDownloaded($downloaded);
+        $announce->setUploaded($uploaded);
+
+        return $announce;
+    }
+
+    public function test_announce_diff(){
+        $announce1 = $this->create_announce(0, 0);
+        $announce2 = $this->create_announce(100, 200);
+
+        $server = $this->udpServer;
+
+        $announceListener = new MockeryCallableMock();
+        $announceListener->shouldBeCalled()->with(
+            \Mockery::type(TrackerEvent::class),
+            $announce1,
+            \Mockery::any()
+        )->once()->ordered();
+
+        $announceListener->shouldBeCalled()->with(
+            \Mockery::type(TrackerEvent::class),
+            $announce2,
+            new Closure(function(AnnounceDifference $diff){
+                return $diff->getDownloaded() == 100 && $diff->getUploaded() == 200;
+            })
+        )->once()->ordered();
+
+        $this->tracker->on("announce", $announceListener);
+        $this->tracker->announce($server, $announce1, new Deferred());
+        $this->tracker->announce($server, $announce2, new Deferred());
+    }
+
     public function test_udp_announce(){
         $infohash = str_repeat("\0", 20);
         $torrent = new Torrent();
@@ -65,14 +106,12 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         $torrent->setInfoHash($infohash);
         $torrent->setFileSize(1024);
 
-        $this->repository->trackTorrent($torrent);
-
-        $connectRequest = new ConnectionRequest();
+        $connectRequest = new UdpConnectionRequest();
         $connectRequest->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('aaaa');
 
-        $this->udpServer->connect($connectRequest)->then(function(ConnectionResponse $response) use($infohash) {
+        $this->udpServer->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($infohash) {
 
             $request = new UdpAnnounceRequest();
             $request->setInfoHash($infohash);
@@ -91,12 +130,12 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
             $this->udpServer->announce($request)->then($announceResponse);
         });
 
-        $connectRequest = new ConnectionRequest();
+        $connectRequest = new UdpConnectionRequest();
         $connectRequest->setRequestEndpoint(Endpoint::fromString("127.0.0.1:81"));
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('cccc');
 
-        $this->udpServer->connect($connectRequest)->then(function(ConnectionResponse $response) use($infohash){
+        $this->udpServer->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($infohash){
 
             $request = new UdpAnnounceRequest();
             $request->setInfoHash($infohash);

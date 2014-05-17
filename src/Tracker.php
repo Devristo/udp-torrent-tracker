@@ -9,8 +9,9 @@
 namespace Devristo\TorrentTracker;
 
 use Devristo\TorrentTracker\Exceptions\TrackerException;
+use Devristo\TorrentTracker\Model\AnnounceDifference;
 use Devristo\TorrentTracker\Model\SwarmPeer;
-use Devristo\TorrentTracker\Model\TorrentRepositoryInterface;
+use Devristo\TorrentTracker\Repository\TorrentRepositoryInterface;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Evenement\EventEmitter;
@@ -40,90 +41,102 @@ class Tracker extends EventEmitter{
     public function __construct(LoggerInterface $logger, TorrentRepositoryInterface $repository){
         $this->torrentRepository = $repository;
         $this->logger = $logger;
-
-        $this->onAnnounce = $this->createAnnounceHandler();
     }
 
     public function bind(ServerInterface $server){
-        $server->on("announce", $this->onAnnounce);
+        $server->on("announce", array($this, 'announce'));
     }
 
-    /**
-     * @return callable
-     */
-    protected function createAnnounceHandler()
-    {
-        return function (ServerInterface $server, AnnounceRequest $trackerRequest, Deferred $result) {
-            $eventObject = new TrackerEvent($trackerRequest);
+    public function announce(ServerInterface $server, AnnounceRequest $trackerRequest, Deferred $result){
+        $infoHash = $trackerRequest->getInfoHash();
 
-            $infoHash = $trackerRequest->getInfoHash();
+        try{
+            $previousAnnounce = $this->torrentRepository->getPeer(
+                $trackerRequest->getInfoHash(),
+                $trackerRequest->getPeerId(),
+                $trackerRequest->getKey()
+            );
 
-            try {
-                $this->emit("announce", array($eventObject));
-            } catch (\Exception $e) {
-                $this->logger->error("Exception raised in announce event listener", array(
-                    'exception' => $e
-                ));
+            if($previousAnnounce)
+                $this->logger->warning("Has previous announce!");
 
-                $result->reject(new TrackerException($trackerRequest, "Error =( contact crew please"));
-                return false;
+            $diff = $previousAnnounce
+                ? AnnounceDifference::diff($previousAnnounce, $trackerRequest)
+                : new AnnounceDifference();
+        } catch (\Exception $e){
+            $this->logger->error("Error looking up previous announce in repository", array(
+                'exception' => $e
+            ));
+            return false;
+        }
+
+        $eventObject = new TrackerEvent();
+        $this->emit("announce", array($eventObject, $trackerRequest, $diff));
+
+
+        if ($eventObject->isCanceled()) {
+            $result->reject(new TrackerException($trackerRequest, $eventObject->getError()));
+            return false;
+        }
+
+        try {
+            $this->torrentRepository->updatePeer(
+                $trackerRequest->getInfoHash(),
+                $trackerRequest->getPeerId(),
+                $trackerRequest->getKey(),
+                $trackerRequest
+            );
+
+            $peers = $this->torrentRepository->getPeers($infoHash);
+
+            $seeders = array_filter($peers, function(AnnounceRequest $peer){return $peer->getLeft() == 0;});
+            $leechers = array_filter($peers, function(AnnounceRequest $peer){return $peer->getLeft() != 0;});
+
+            $numSeeders = count($seeders);
+            $numLeechers = count($leechers);
+
+            // Make sure the client does not get his own IP back
+            $compositeKey = $trackerRequest->getPeerId().$trackerRequest->getKey();
+            if(array_key_exists($compositeKey, $seeders))
+                unset($seeders[$compositeKey]);
+
+            if(array_key_exists($compositeKey, $leechers))
+                unset($leechers[$compositeKey]);
+
+            // For leechers we give leechers + seeders back
+            if ($trackerRequest->getLeft() > 0) {
+                $peers = array_merge($seeders, $leechers);
+                shuffle($peers);
+            } else {
+                // Prioritise leechers over peers when you are a seeder
+                shuffle($leechers);
+                shuffle($seeders);
+                $peers = array_merge($leechers, $seeders);
             }
 
-            if ($eventObject->isCanceled()) {
-                $result->reject(new TrackerException($trackerRequest, $eventObject->getError()));
-                return false;
-            }
+            // Return a subset of peers
+            $numPeers = min(min(count($peers), $trackerRequest->getNumWant()), $this->getMaxAnnouncePeers());
+            $peers = array_slice($peers, 0, $numPeers);
 
-            try {
-                $event = $trackerRequest->getEvent();
-                $this->torrentRepository->updatePeer($trackerRequest);
+            $peers = array_map(function(AnnounceRequest $request){
+                return new SwarmPeer($request->getIpv4(), $request->getPort());
+            }, $peers);
 
-                $seeders = $this->torrentRepository->getSeeders($infoHash);
-                $leechers = $this->torrentRepository->getLeechers($infoHash);
+            $response = new AnnounceResponse($trackerRequest);
+            $response->setLeechers($numLeechers);
+            $response->setSeeders($numSeeders);
+            $response->setPeers($peers);
 
-                $numSeeders = count($seeders);
-                $numLeechers = count($leechers);
+            $result->resolve($response);
 
-                if(array_key_exists($trackerRequest->getPeerId(), $seeders))
-                    unset($seeders[$trackerRequest->getPeerId()]);
+            return true;
+        } catch (\Exception $e) {
+            $this->logger->error("Cannot announce", array(
+                'exception' => $e
+            ));
 
-                if(array_key_exists($trackerRequest->getPeerId(), $leechers))
-                    unset($leechers[$trackerRequest->getPeerId()]);
-
-                // For leechers we give leechers + seeders back
-                if ($event == AnnounceRequest::EVENT_NONE || $event == AnnounceRequest::EVENT_STARTED) {
-                    $peers = array_merge($seeders, $leechers);
-                    shuffle($peers);
-                } else {
-                    // Prioritise leechers over peers when you are a seeder
-                    shuffle($leechers);
-                    shuffle($peers);
-                    $peers = array_merge($leechers, $seeders);
-                }
-
-                $numPeers = min(min(count($peers), $trackerRequest->getNumWant()), $this->maxAnnouncePeers);
-                $peers = array_slice($peers, 0, $numPeers);
-
-                $peers = array_map(function(AnnounceRequest $request){
-                    return new SwarmPeer($request->getIpv4(), $request->getPort());
-                }, $peers);
-
-                $response = new AnnounceResponse($trackerRequest);
-                $response->setLeechers($numLeechers);
-                $response->setSeeders($numSeeders);
-                $response->setPeers($peers);
-
-                $result->resolve($response);
-
-                return true;
-            } catch (\Exception $e) {
-                $this->logger->error("Cannot announce", array(
-                    'exception' => $e
-                ));
-
-                $result->reject(new TrackerException($trackerRequest, "Error =( contact crew please"));
-                return false;
-            }
-        };
+            $result->reject(new TrackerException($trackerRequest, "Error =( contact crew please"));
+            return false;
+        }
     }
 } 

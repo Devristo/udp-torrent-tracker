@@ -60,6 +60,9 @@ class Server extends EventEmitter implements ServerInterface{
         if(!$announce->getIpv4())
             $announce->setIpv4($announce->getRequestEndpoint()->getIp());
 
+        if(!$announce->getPort())
+            $announce->setPort($announce->getRequestEndpoint()->getPort());
+
         $this->emit("announce", array($this, $announce, $deferred));
         return $deferred->promise();
     }

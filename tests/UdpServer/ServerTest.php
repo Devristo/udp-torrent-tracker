@@ -10,10 +10,10 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
-use Devristo\TorrentTracker\Messages\UdpAnnounceRequest;
-use Devristo\TorrentTracker\Messages\ConnectionRequest;
-use Devristo\TorrentTracker\Messages\ConnectionResponse;
 use Devristo\TorrentTracker\Model\Endpoint;
+use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
+use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use React\EventLoop\Factory;
@@ -57,7 +57,7 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function test_announce(){
-        $connectRequest = new ConnectionRequest();
+        $connectRequest = new UdpConnectionRequest();
         $connectRequest->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('aaaa');
@@ -69,8 +69,8 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
         $onResponse->shouldBeCalled()->once();
 
         $this->server->on("connect", $onConnect);
-        $this->server->connect($connectRequest)->then(function(ConnectionResponse $response) use($onResponse){
-            $this->assertInstanceOf(ConnectionResponse::class, $response);
+        $this->server->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($onResponse){
+            $this->assertInstanceOf(UdpConnectionResponse::class, $response);
             $request = new UdpAnnounceRequest();
             $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
             $request->setTransactionId('bbbb');

@@ -6,7 +6,7 @@
  * Time: 18:35
  */
 
-use Devristo\TorrentTracker\Model\ArrayRepository;
+use Devristo\TorrentTracker\Repository\ArrayRepository;
 use Devristo\TorrentTracker\UdpServer\Server as UdpServer;
 use Devristo\TorrentTracker\TcpServer\Server as TcpServer;
 use Devristo\TorrentTracker\Tracker;
@@ -29,9 +29,12 @@ $tracker = new Tracker($logger, $repository);
 $tracker->bind($udpServer);
 $tracker->bind($tcpServer);
 
-
-$tracker->on('announce', function(\Devristo\TorrentTracker\TrackerEvent $event){
-
+$tracker->on('announce', function(\Devristo\TorrentTracker\AnnounceEvent $event) use($logger){
+    $logger->warning("New announce received", array(
+        'client' => bin2hex($event->getRequest()->getPeerId()),
+        'dDown' => $event->getDifference()->getDownloaded(),
+        'dUp' => $event->getDifference()->getUploaded()
+    ));
 });
 
 $loop->run();
