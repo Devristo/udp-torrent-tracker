@@ -30,9 +30,9 @@ class Server extends EventEmitter implements ServerInterface{
     protected $messageHandlers;
     protected $logger;
 
-    public function __construct(LoggerInterface $logger){
+    public function __construct(LoggerInterface $logger, array $messageFactory=null){
         $this->logger = $logger;
-        $this->conversion = new Serializer();
+        $this->conversion = new Serializer($messageFactory);
 
         $this->messageHandlers = array(
             "announce" => array($this, 'announce'),
@@ -84,7 +84,7 @@ class Server extends EventEmitter implements ServerInterface{
             $this->logger->error("Cannot handle request", array(
                 'exception' => $e
             ));
-            $promise = (new Deferred())->reject('Cannot handle request');
+            $promise = (new Deferred())->reject(new \Exception('Cannot handle request'));
         }
 
         return $promise;
@@ -107,7 +107,7 @@ class Server extends EventEmitter implements ServerInterface{
 
                 $connection->send((string) $response);
                 $connection->close();
-            }, function(\Exception $exception) use ($connection, $request){
+            }, function($exception) use ($connection, $request){
 
                 if($exception instanceof TrackerException) {
                     $error = new ErrorResponse($exception->getRequest(), $exception->getMessage());

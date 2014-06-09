@@ -10,8 +10,10 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 
 use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Message\AuthenticationExtension;
+use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Devristo\TorrentTracker\Message\TrackerResponse;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
@@ -20,13 +22,22 @@ use Devristo\TorrentTracker\Message\Pack;
 use Devristo\TorrentTracker\Message\TrackerRequest;
 use Devristo\TorrentTracker\Message\RequestStringExtension;
 use Devristo\TorrentTracker\Message\ScrapeResponse;
-use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
-use Devristo\TorrentTracker\UdpServer\Message\UdpScrapeRequest;
 
 class Serializer {
     const PACKET_TYPE_CONNECT = 0;
     const PACKET_TYPE_ANNOUNCE = 1;
     const PACKET_TYPE_SCRAPE = 2;
+
+    public function __construct(array $messageFactory){
+        $this->messageFactory = array(
+            "announce" => function(){return new AnnounceRequest();},
+            "scrape" => function(){return new AnnounceRequest();}
+        );
+
+        if($messageFactory){
+            $this->messageFactory = array_merge($this->messageFactory, $messageFactory);
+        }
+    }
 
     /**
      * @param $data
@@ -84,17 +95,13 @@ class Serializer {
         list(,$ipv4) = unpack("N", substr($data, $offset, 4)); $offset += 4;
         $ipv4 = long2ip($ipv4);
 
-
-        list(,$key) = unpack("N", substr($data, $offset, 4)); $offset += 4;
+        $key = substr($data, $offset, 4); $offset += 4;
         $numWant = Pack::unpack_int32be(substr($data, $offset, 4)); $offset += 4;
 
         list($port) = array_values(unpack("n", substr($data, $offset, 2)));
         $offset += 2;
 
-        $o = new UdpAnnounceRequest();
-
-        $o->setConnectionId(bin2hex($connectionId));
-        $o->setTransactionId($transactionId);
+        $o = $this->messageFactory['announce']();
 
         $o->setInfoHash(($infoHash));
         $o->setPeerId($peerId);
@@ -103,7 +110,7 @@ class Serializer {
         $o->setUploaded($uploaded);
         $o->setEvent($event);
         $o->setIpv4($ipv4);
-        $o->setkey($key);
+        $o->setKey($key);
         $o->setNumWant($numWant);
         $o->setPort($port);
 
@@ -122,7 +129,7 @@ class Serializer {
         if($action !== 1)
             throw new ProtocolViolationException("Action should be 1 for a ANNOUNCE INPUT");
 
-        return $o;
+        return [$connectionId, $transactionId, $o];
     }
 
     public function decodeConnect($data)
@@ -137,9 +144,7 @@ class Serializer {
         $offset += 8;
 
         $struct = unpack("Naction/Ntransaction", substr($data, $offset, 8));
-
-        $o->setConnectionId(bin2hex($connectionId));
-        $o->setTransactionId($struct['transaction']);
+        $transactionId = $struct['transaction'];
 
         if($struct['action'] !== 0)
             throw new ProtocolViolationException("Action should be 0 for a CONNECT INPUT");
@@ -147,13 +152,12 @@ class Serializer {
         if($connectionId !== hex2bin("0000041727101980"))
             throw new ProtocolViolationException("ConnectionId shoulde be 0x41727101980 for CONNECT INPUT");
 
-        return $o;
+        return [$connectionId, $transactionId, $o];
     }
 
     public function decodeScrape($data){
         if(strlen($data) < 20)
             throw new ProtocolViolationException("Data packet should be at least 20 bytes long");
-
 
         $offset = 0;
         $connectionId = substr($data, $offset, 8);
@@ -164,10 +168,7 @@ class Serializer {
         $transactionId = substr($data, $offset, 4);
         $offset +=4;
 
-        $o = new UdpScrapeRequest();
-
-        $o->setConnectionId(bin2hex($connectionId));
-        $o->setTransactionId(bin2hex($transactionId));
+        $o = $this->messageFactory['scrape']();
 
         $infoHashes = array();
         while($offset + 20 <= strlen($data)){
@@ -177,14 +178,13 @@ class Serializer {
 
         $o->setInfoHashes($infoHashes);
 
-
         if($action !== 2)
             throw new ProtocolViolationException("Action should be 2 for a SCRAPE INPUT");
 
-        return $o;
+        return [$connectionId, $transactionId, $o];
     }
 
-    public function encode(TrackerResponse $response){
+    public function encode($transactionId, TrackerResponse $response){
         $encoders = array(
             "announce" => array($this, 'encodeAnnounce'),
             "connect" => array($this, 'encodeConnect'),
@@ -194,11 +194,11 @@ class Serializer {
 
         $callable = $encoders[$response->getMessageType()];
 
-        return call_user_func($callable, $response);
+        return call_user_func($callable, $transactionId, $response);
     }
 
-    public function encodeScrape(ScrapeResponse $response){
-        $header = pack("NN", 2, $response->getRequest()->getTransactionId());
+    public function encodeScrape($transactionId, ScrapeResponse $response){
+        $header = pack("NN", 2, $transactionId);
 
         // Take order of request, this is important!
         foreach($response->getRequest()->getInfoHashes() as $infohash){
@@ -211,12 +211,12 @@ class Serializer {
         return $header;
     }
 
-    public function encodeConnect(UdpConnectionResponse $response){
-        return pack("NN", 0, $response->getRequest()->getTransactionId()).hex2bin($response->getConnectionId());
+    public function encodeConnect($transactionId, UdpConnectionResponse $response){
+        return pack("NN", 0, $transactionId).$response->getConnectionId();
     }
 
-    public function encodeAnnounce(AnnounceResponse $response){
-        $header = pack("NNNNN", 1, $response->getRequest()->getTransactionId(), $response->getInterval(), $response->getLeechers(), $response->getSeeders());
+    public function encodeAnnounce($transactionId, AnnounceResponse $response){
+        $header = pack("NNNNN", 1, $transactionId, $response->getInterval(), $response->getLeechers(), $response->getSeeders());
 
         $peerData = '';
         foreach($response->getPeers() as $peer){
@@ -226,7 +226,7 @@ class Serializer {
         return $header.$peerData;
     }
 
-    public function encodeError(ErrorResponse $response){
-        return pack("NN", 3, $response->getRequest()->getTransactionId()).$response->getMessage();
+    public function encodeError($transactionId, ErrorResponse $response){
+        return pack("NN", 3, $transactionId).$response->getMessage();
     }
 } 

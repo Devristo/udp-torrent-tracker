@@ -38,7 +38,7 @@ class Tracker extends EventEmitter{
         $this->maxAnnouncePeers = $maxAnnouncePeers;
     }
 
-    public function __construct(LoggerInterface $logger, TorrentRepositoryInterface $repository){
+    public function __construct(LoggerInterface $logger, $repository){
         $this->torrentRepository = $repository;
         $this->logger = $logger;
     }

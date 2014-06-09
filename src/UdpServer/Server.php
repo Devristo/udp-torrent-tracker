@@ -42,9 +42,9 @@ class Server extends EventEmitter implements ServerInterface
      */
     protected $_connections = array();
 
-    public function __construct(LoggerInterface $logger){
+    public function __construct(LoggerInterface $logger, array $messageFactory=null){
         $this->logger = $logger;
-        $this->serializer = new Serializer();
+        $this->serializer = new Serializer($messageFactory);
     }
 
     public function bind(LoopInterface $eventLoop, $bindAddress="0.0.0.0:6881"){
@@ -59,26 +59,7 @@ class Server extends EventEmitter implements ServerInterface
 
             $server->on("message", function($buf, $address){
                 try{
-                    $this->acceptMessage($buf, $address)->then(
-                        function(TrackerResponse $response){
-                            $this->logger->notice("Sending response", array(
-                                'type' => $response->getMessageType(),
-                                'address' => $response->getRequest()->getRequestEndpoint()->toString()
-                            ));
-                            $this->send($response);
-                        }, function (\Exception $e) use ($address){
-
-                            if($e instanceof TrackerException) {
-                                $trackerResponse = new ErrorResponse($e->getRequest(), $e->getMessage());
-                                $this->send($trackerResponse);
-                            }
-
-                            $this->logger->error($e->getMessage(), array(
-                                'exception' => $e,
-                                'address' => $address
-                            ));
-                        }
-                    );
+                    $this->acceptMessage($buf, $address);
                 } catch(\Exception $exception){
                     $this->logger->error('Unhandled exception', array(
                         'exception' => $exception,
@@ -97,14 +78,13 @@ class Server extends EventEmitter implements ServerInterface
      */
     public function connect(UdpConnectionRequest $in){
         do{
-            $connectionId = bin2hex(pack("NN",rand(0,2000000000),rand(0,2000000000)));
+            $connectionId = openssl_random_pseudo_bytes(8);
         } while(array_key_exists($connectionId, $this->_connections));
 
         $this->_connections[$connectionId] = new Connection($connectionId, new DateTime());
 
         $reply = new UdpConnectionResponse($in);
         $reply->setConnectionId($connectionId);
-        $reply->setTransactionId($in->getTransactionId());
 
         $this->emit("connect", array($this, $in));
 
@@ -117,20 +97,12 @@ class Server extends EventEmitter implements ServerInterface
     public function announce(AnnounceRequest $announce){
         $deferred = new Deferred();
 
-        if(!array_key_exists($announce->getConnectionId(), $this->_connections)){
-            $deferred->reject(new TrackerException($announce,"Client not connected"));
-            return $deferred->promise();
-        }
-
         # Use announce address if no peer address given
         if(!$announce->getIpv4())
             $announce->setIpv4($announce->getRequestEndpoint()->getIp());
 
         if(!$announce->getPort())
             $announce->setPort($announce->getRequestEndpoint()->getPort());
-
-        # Heartbeat
-        $this->_connections[$announce->getConnectionId()]->setLastHeartbeat(new DateTime());
 
         $this->emit("announce", array($this, $announce, $deferred));
 
@@ -140,45 +112,70 @@ class Server extends EventEmitter implements ServerInterface
     public function scrape(ScrapeRequest $scrape)
     {
         $deferred = new Deferred();
-
-        if(!array_key_exists($scrape->getConnectionId(), $this->_connections)){
-            $deferred->reject(new TrackerException($scrape, "Client not connected"));
-            return $deferred->promise();
-        }
-
-        # Heartbeat
-        $this->_connections[$scrape->getConnectionId()]->setLastHeartbeat(new DateTime());
         $this->emit("scrape", array($this, $scrape, $deferred));
 
         return $deferred->promise();
     }
 
+    private function validateConnection(UdpConnection $connection){
+        return array_key_exists($connection->getConnectionId(), $this->_connections);
+    }
+
     public function acceptMessage($buf, $address)
     {
-        $inputPacket = $this->serializer->decode($buf);
+        list($connectionId, $transactionId, $inputPacket) = $this->serializer->decode($buf);
+        $udpConnection = new UdpConnection($connectionId, $transactionId);
+
         $endpoint = Endpoint::fromString($address);
-
         $inputPacket->setRequestEndpoint($endpoint);
-
-        $promise = new Deferred();
-        $promise->reject(new TrackerException($inputPacket, "Unknown request"));
 
         if($inputPacket instanceof UdpConnectionRequest)
             $promise = $this->connect($inputPacket);
-        elseif($inputPacket instanceof AnnounceRequest)
+        elseif(!$this->validateConnection($udpConnection)){
+            $promise = new Deferred();
+            $promise->reject(new TrackerException($inputPacket,"Client not connected"));
+        } else {
+            # Heartbeat
+            $this->_connections[$connectionId]->setLastHeartbeat(new DateTime());
+        }
+
+        if($inputPacket instanceof AnnounceRequest) {
             $promise = $this->announce($inputPacket);
-        elseif($inputPacket instanceof ScrapeRequest)
+        }elseif($inputPacket instanceof ScrapeRequest) {
             $promise = $this->scrape($inputPacket);
+        }
+
+        if(!isset($promise))
+            throw new \InvalidArgumentException("Unknown request");
 
         # Trigger events
         $this->emit("input", array($this, $inputPacket));
 
-        return $promise;
+        return $promise->then(
+            function(TrackerResponse $response) use($udpConnection){
+                $this->logger->notice("Sending response", array(
+                    'type' => $response->getMessageType(),
+                    'address' => $response->getRequest()->getRequestEndpoint()->toString()
+                ));
+
+                $this->send($udpConnection, $response);
+            }, function (\Exception $e) use ($udpConnection, $address){
+                if($e instanceof TrackerException) {
+                    $trackerResponse = new ErrorResponse($e->getRequest(), $e->getMessage());
+                    $this->send($udpConnection, $trackerResponse);
+                }
+
+                $this->logger->error($e->getMessage(), array(
+                    'exception' => $e,
+                    'address' => $address
+                ));
+            }
+        );
     }
 
-    protected function send(TrackerResponse $response){
+    protected function send(UdpConnection $connection, TrackerResponse $response){
         $address = $response->getRequest()->getRequestEndpoint()->toString();
-        $buff = $this->serializer->encode($response);
+        $buff = $this->serializer->encode($connection->getTransactionId(),$response);
         $this->socket->send($buff, $address);
     }
 }

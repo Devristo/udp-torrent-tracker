@@ -31,12 +31,21 @@ class Serializer {
     protected $encodeHandlers;
     protected $bee;
 
-    public function __construct(){
+    public function __construct(array $messageFactory=null){
         $this->routes = new RouteCollection();
-        $this->routes->add('announce', new Route('/announce'));
+        $this->routes->add('announce', new Route('/announce/{userid}/{token}'));
         $this->routes->add('scrape', new Route('/scrape'));
 
         $this->bee = new Bee();
+
+        $this->messageFactory = array(
+            "announce" => function(){return new AnnounceRequest();},
+            "scrape" => function(){return new AnnounceRequest();}
+        );
+
+        if($messageFactory){
+            $this->messageFactory = array_merge($this->messageFactory, $messageFactory);
+        }
 
         $this->decodeHandlers = array(
             "announce" => array($this, 'decodeAnnounce'),
@@ -84,7 +93,7 @@ class Serializer {
 
         $query = $httpRequest->getQuery();
 
-        $announce = new AnnounceRequest();
+        $announce = $this->messageFactory['announce']();
         $announce->setInfoHash($query['info_hash']);
         $announce->setPeerId($query['peer_id']);
         $announce->setPort(intval($query['port'], 10));
@@ -93,18 +102,18 @@ class Serializer {
         $announce->setLeft($query['left']);
         $announce->setRequestString($httpRequest->getResource());
 
-        $eventKey = array_key_exists('event', $query) && array_key_exists($query['event'], $eventMap)
+        $eventKey = $query->hasKey('event') && array_key_exists($query['event'], $eventMap)
             ? $query['event'] : null;
         $announce->setEvent($eventMap[$eventKey]);
 
-        if(array_key_exists('ip', $query))
+        if($query->hasKey('ip'))
             $announce->setIpv4($query['ip']);
 
-        if(array_key_exists('numwant', $query))
+        if($query->hasKey('numwant'))
             $announce->setNumWant($query['numwant']);
 
-        if(array_key_exists('key', $query))
-            $announce->setKey($query['key']);
+        if($query->hasKey('key'))
+            $announce->setKey(hex2bin($query['key']));
 
         return $announce;
     }
@@ -115,7 +124,7 @@ class Serializer {
         if (is_string($hashes))
             $hashes = array($hashes);
 
-        $scrape = new ScrapeRequest();
+        $scrape = $this->messageFactory['scrape']();
         $scrape->setInfoHashes($hashes);
         return $scrape;
     }

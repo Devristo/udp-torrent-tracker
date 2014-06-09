@@ -14,7 +14,23 @@ use Devristo\TorrentTracker\Message\TrackerRequest;
 
 
 class UdpConnectionRequest extends TrackerRequest{
-    use RequestTrait;
+    protected $connectionId;
+
+    /**
+     * @return mixed
+     */
+    public function getConnectionId()
+    {
+        return $this->connectionId;
+    }
+
+    /**
+     * @param mixed $connectionId
+     */
+    public function setConnectionId($connectionId)
+    {
+        $this->connectionId = $connectionId;
+    }
 
     /**
      * @return mixed

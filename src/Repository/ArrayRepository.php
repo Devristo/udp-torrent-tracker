@@ -11,6 +11,7 @@ namespace Devristo\TorrentTracker\Repository;
 
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Model\TorrentInterface;
+use Psr\Log\LoggerInterface;
 
 class ArrayRepository implements TorrentRepositoryInterface
 {
@@ -38,6 +39,12 @@ class ArrayRepository implements TorrentRepositoryInterface
      */
     protected $times = array();
 
+    protected $logger;
+
+    public function __construct(LoggerInterface $logger){
+        $this->logger = $logger;
+    }
+
     public function getPeers($infohash)
     {
         if (!array_key_exists($infohash, $this->peers))
@@ -49,6 +56,7 @@ class ArrayRepository implements TorrentRepositoryInterface
     public function updatePeer($infoHash, $peerId, $key, AnnounceRequest $request)
     {
         $compositeKey = $peerId.$key;
+        $this->logger->info("Updating peer", array(bin2hex($compositeKey)));
 
         if ($request->getEvent() == AnnounceRequest::EVENT_STOPPED) {
             unset($this->peers[$infoHash][$compositeKey]);

@@ -15,7 +15,7 @@ class ErrorResponse extends TrackerResponse {
 
     protected $message;
 
-    public function __construct(TrackerRequest $request, $message){
+    public function __construct(TrackerRequest $request=null, $message){
         parent::__construct($request);
         $this->setMessage($message);
     }
