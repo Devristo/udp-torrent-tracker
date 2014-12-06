@@ -94,6 +94,8 @@ class Serializer {
         $query = $httpRequest->getQuery();
 
         $announce = $this->messageFactory['announce']();
+        /** @var $announce AnnounceRequest */
+
         $announce->setInfoHash($query['info_hash']);
         $announce->setPeerId($query['peer_id']);
         $announce->setPort(intval($query['port'], 10));
@@ -124,6 +126,7 @@ class Serializer {
         if (is_string($hashes))
             $hashes = array($hashes);
 
+        /** @var ScrapeRequest $scrape */
         $scrape = $this->messageFactory['scrape']();
         $scrape->setInfoHashes($hashes);
         return $scrape;

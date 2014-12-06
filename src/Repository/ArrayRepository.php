@@ -28,21 +28,13 @@ class ArrayRepository implements TorrentRepositoryInterface
     protected $peers = array();
 
     /**
-     * Map of Infohash => [PeerID => seeder (bool)]
-     * @var array
-     */
-    protected $seeders = array();
-
-    /**
      * Map of Infohash => [PeerID => unixtimestamp]
      * @var array
      */
     protected $times = array();
 
-    protected $logger;
 
-    public function __construct(LoggerInterface $logger){
-        $this->logger = $logger;
+    public function __construct(){
     }
 
     public function getPeers($infohash)
@@ -56,7 +48,6 @@ class ArrayRepository implements TorrentRepositoryInterface
     public function updatePeer($infoHash, $peerId, $key, AnnounceRequest $request)
     {
         $compositeKey = $peerId.$key;
-        $this->logger->info("Updating peer", array(bin2hex($compositeKey)));
 
         if ($request->getEvent() == AnnounceRequest::EVENT_STOPPED) {
             unset($this->peers[$infoHash][$compositeKey]);
@@ -80,5 +71,17 @@ class ArrayRepository implements TorrentRepositoryInterface
         if(array_key_exists($infoHash, $this->peers) && array_key_exists($compositeKey, $this->peers[$infoHash]))
             return $this->peers[$infoHash][$compositeKey];
         else return null;
+    }
+
+    public function invalidateSessionsByTime($time){
+        $clone = $this->times;
+        foreach($clone as $infoHash => $peers){
+            foreach($peers as $compositeKey => $heartbeat){
+                if($heartbeat < $time){
+                    unset($this->times[$infoHash][$compositeKey]);
+                    unset($this->peers[$infoHash][$compositeKey]);
+                }
+            }
+        }
     }
 }

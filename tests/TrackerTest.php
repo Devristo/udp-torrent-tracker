@@ -10,6 +10,7 @@ namespace Devristo\TorrentTracker;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
+use Devristo\TorrentTracker\Exceptions\TrackerException;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Model\AnnounceDifference;
@@ -21,6 +22,7 @@ use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
 use Devristo\TorrentTracker\UdpServer\Server;
+use Devristo\TorrentTracker\UdpServer\UdpTransaction;
 use Mockery\Matcher\Closure;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
@@ -53,11 +55,9 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         $this->logger = new Logger('TrackerTest');
         $this->repository = new ArrayRepository();
 
-        $this->udpServer = new Server($this->logger);
+        $this->tracker = new Tracker($this->repository);
+        $this->udpServer = new Server($this->tracker, $this->logger);
         $this->udpServer->bind($this->loop, "0.0.0.0:6881");
-
-        $this->tracker = new Tracker($this->logger, $this->repository);
-        $this->tracker->bind($this->udpServer);
     }
 
     private function create_announce($downloaded, $uploaded, $peerId=null, $infoHash=null){
@@ -77,8 +77,6 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         $announce1 = $this->create_announce(0, 0);
         $announce2 = $this->create_announce(100, 200);
 
-        $server = $this->udpServer;
-
         $announceListener = new MockeryCallableMock();
         $announceListener->shouldBeCalled()->with(
             \Mockery::type(TrackerEvent::class),
@@ -95,8 +93,8 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         )->once()->ordered();
 
         $this->tracker->on("announce", $announceListener);
-        $this->tracker->announce($server, $announce1, new Deferred());
-        $this->tracker->announce($server, $announce2, new Deferred());
+        $this->tracker->announce($announce1, new Deferred());
+        $this->tracker->announce($announce2, new Deferred());
     }
 
     public function test_udp_announce(){
@@ -111,53 +109,58 @@ class TrackerTest extends \PHPUnit_Framework_TestCase {
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('aaaa');
 
-        $this->udpServer->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($infohash) {
+        $response = $this->udpServer->connect($connectRequest);
 
-            $request = new UdpAnnounceRequest();
-            $request->setInfoHash($infohash);
-            $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
-            $request->setTransactionId('bbbb');
-            $request->setConnectionId($response->getConnectionId());
+        $request = new AnnounceRequest();
+        $request->setInfoHash($infohash);
+        $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
 
-            $announceResponse = new MockeryCallableMock();
-            $announceResponse->shouldBeCalled()->once()->with(new Closure(function(AnnounceResponse $response){
-                $this->assertEquals(0, count($response->getPeers()));
-                $this->assertEquals('bbbb', $response->getRequest()->getTransactionId());
-
-                return true;
-            }));
-
-            $this->udpServer->announce($request)->then($announceResponse);
-        });
+        $udpConnection = new UdpTransaction($response->getConnectionId(), 'bbb');
+        $announceResponse = $this->udpServer->acceptMessage($udpConnection, $request);
+        $this->assertEquals(
+            0, count($announceResponse->getPeers())
+        );
 
         $connectRequest = new UdpConnectionRequest();
         $connectRequest->setRequestEndpoint(Endpoint::fromString("127.0.0.1:81"));
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('cccc');
 
-        $this->udpServer->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($infohash){
+        $response = $this->udpServer->connect($connectRequest);
 
-            $request = new UdpAnnounceRequest();
-            $request->setInfoHash($infohash);
-            $request->setPeerId("A");
-            $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:81"));
-            $request->setTransactionId('dddd');
-            $request->setConnectionId($response->getConnectionId());
+        $request = new AnnounceRequest();
+        $request->setInfoHash($infohash);
+        $request->setPeerId("A");
+        $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:81"));
 
-            $announceResponse = new MockeryCallableMock();
-            $announceResponse->shouldBeCalled()->once()->with(new Closure(function(AnnounceResponse $response){
-                $this->assertEquals(1, count($response->getPeers()));
-                $this->assertEquals('dddd', $response->getRequest()->getTransactionId());
+        $udpConnection = new UdpTransaction($response->getConnectionId(), 'dddd');
+        $response = $this->udpServer->acceptMessage($udpConnection, $request);
 
-                $peer = $response->getPeers()[0];
-                $this->assertInstanceOf(SwarmPeer::class, $peer, "Peer should be a SwarmPeer");
-                $this->assertEquals(80, $peer->getPort());
+        $this->assertEquals(1, count($response->getPeers()));
 
-                return true;
-            }));
+        $peer = $response->getPeers()[0];
+        $this->assertInstanceOf(SwarmPeer::class, $peer, "Peer should be a SwarmPeer");
+        $this->assertEquals(80, $peer->getPort());
 
-            $this->udpServer->announce($request)->then($announceResponse);
+        return true;
+    }
+
+
+    public function test_announce_cancel(){
+        $announce = $this->create_announce(0,0);
+
+        $this->tracker->on("announce", function(TrackerEvent $event, AnnounceRequest $request, AnnounceDifference $delta){
+            $event->cancel("Ratio limit enforced!");
         });
+
+        try {
+            $this->tracker->announce($announce);
+        } catch(TrackerException $e){
+            $this->assertEquals('Ratio limit enforced!', $e->getMessage());
+            return;
+        }
+
+        $this->fail('An expected exception has not been raised.');
     }
 }
  

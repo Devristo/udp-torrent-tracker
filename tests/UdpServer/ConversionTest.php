@@ -8,6 +8,7 @@
 
 namespace Devristo\TorrentTracker\UdpServer;
 
+use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Model\SwarmPeer;
 use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
@@ -34,26 +35,25 @@ class ConversionTest extends \PHPUnit_Framework_TestCase
     {
         # Opening CONNECT handshake sent by CLIENT
         $connect_raw = hex2bin("0000041727101980000000006b61e6f3");
-        $connect = $this->conversion->decode($connect_raw);
+        list($connectionId, $transactionId, $connect) = $this->conversion->decode($connect_raw);
         $this->assertInstanceOf(UdpConnectionRequest::class, $connect);
 
         # Response by SERVER
         $connect_response = new UdpConnectionResponse($connect);
-        $connect_response->setConnectionId("e65e7e630f50b38a");
-        $connect_response->setTransactionId($connect->getTransactionId());
+        $connect_response->setConnectionId(hex2bin("e65e7e630f50b38a"));
 
         # Check whether this response is equal to the captured data
-        $this->assertEquals("000000006b61e6f3e65e7e630f50b38a", bin2hex($this->conversion->encode($connect_response)));
+        $this->assertEquals("000000006b61e6f3e65e7e630f50b38a", bin2hex($this->conversion->encode($transactionId, $connect_response)));
 
         # ANNOUNCE sent by CLIENT
         $announce_raw = hex2bin("e65e7e630f50b38a00000001be4420316a36de201df2f1b2c817474c3075ff0eaa8c77852d7142333042302d4371463573297537796b36280000000000000000000000002a00000000000000000000000000000200000000a0ad9d43000000c81ae102092f616e6e6f756e6365");
-        $announce = $this->conversion->decode($announce_raw);
+        list($connectionId, $transactionId, $announce) = $this->conversion->decode($announce_raw);
 
-        $this->assertInstanceOf(UdpAnnounceRequest::class, $announce);
+        $this->assertInstanceOf(AnnounceRequest::class, $announce);
 
         # Test whether we parsed the announce correctly
         $this->assertEquals("6a36de201df2f1b2c817474c3075ff0eaa8c7785", bin2hex($announce->getInfoHash()));
-        $this->assertEquals("e65e7e630f50b38a", $announce->getConnectionId());
+        $this->assertEquals("e65e7e630f50b38a", bin2hex($connectionId));
 
         # Recreate the ANNOUNCE response
 
@@ -68,10 +68,10 @@ class ConversionTest extends \PHPUnit_Framework_TestCase
             return new SwarmPeer($peer[0], $peer[1]);
         }, $peers));
 
-
         # Check whether our responds matches the captured data
-        $announce_response_raw = hex2bin("00000001be4420310000070c0000000100000006915e2f131ae1b2ed208405dcb19fd4e867dfb125a08c47096de33f261ae163a6aa781ae14c0097376aa7");
-        $this->assertEquals($announce_response_raw, $this->conversion->encode($our_response));
+        $announce_response_raw = "00000001be4420310000070c0000000100000006915e2f131ae1b2ed208405dcb19fd4e867dfb125a08c47096de33f261ae163a6aa781ae14c0097376aa7";
+        list(,$transactionId) = unpack("N", hex2bin("be442031"));
+        $this->assertEquals($announce_response_raw, bin2hex($this->conversion->encode($transactionId, $our_response)));
     }
 }
  

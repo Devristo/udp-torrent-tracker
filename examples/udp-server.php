@@ -21,22 +21,11 @@ require_once __DIR__.'/../vendor/autoload.php';
 
 $loop = Factory::create();
 $logger = new Logger('TrackerTest');
-$repository = new ArrayRepository($logger);
+$repository = new ArrayRepository();
 
-$messageFactory = [
-    "announce"  => function(){return new AnnounceRequest();},
-    "scrape"    => function(){return new ScrapeRequest();},
-];
-
-$udpServer = new UdpServer($logger, $messageFactory);
+$tracker = new Tracker($repository);
+$udpServer = new UdpServer($tracker, $logger);
 $udpServer->bind($loop, "0.0.0.0:6881");
-
-$tcpServer = new TcpServer($logger, $messageFactory);
-$tcpServer->bind($loop);
-
-$tracker = new Tracker($logger, $repository);
-$tracker->bind($udpServer);
-$tracker->bind($tcpServer);
 
 $tracker->on('announce', function(TrackerEvent $event, AnnounceRequest $request, AnnounceDifference $diff) use($logger){
     $logger->warning("New announce received", array(

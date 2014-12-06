@@ -9,7 +9,7 @@
 namespace Devristo\TorrentTracker\UdpServer;
 
 
-class UdpConnection {
+class UdpTransaction {
     protected $connectionId;
     protected $transactionId;
 

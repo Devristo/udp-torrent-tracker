@@ -31,22 +31,6 @@ class UdpConnectionResponse extends TrackerResponse{
         return $this->connectionId;
     }
 
-    /**
-     * @param mixed $transactionId
-     */
-    public function setTransactionId($transactionId)
-    {
-        $this->transactionId = $transactionId;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getTransactionId()
-    {
-        return $this->transactionId;
-    }
-
     public function isOpenHandshake(){
         return $this->connectionId == ("000041727101980");
     }

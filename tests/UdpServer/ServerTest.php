@@ -10,14 +10,20 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
+use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceResponse;
+use Devristo\TorrentTracker\Message\TrackerResponse;
 use Devristo\TorrentTracker\Model\Endpoint;
+use Devristo\TorrentTracker\Tracker;
 use Devristo\TorrentTracker\UdpServer\Message\UdpAnnounceRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
+use Mockery;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use React\EventLoop\Factory;
 use React\Promise\Deferred;
+use React\Promise\FulfilledPromise;
 
 class ServerTest extends \PHPUnit_Framework_TestCase {
     /** @var Logger */
@@ -25,6 +31,9 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
 
     /** @var Server */
     protected $server;
+
+    /** @var Mockery\MockInterface|Tracker */
+    protected $tracker;
 
     public function tearDown(){
         \Mockery::close();
@@ -34,26 +43,19 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
         $loop = Factory::create();
         $this->logger = new Logger("Server test");
         $this->logger->pushHandler(new StreamHandler("php://output"));
-        $this->server = new Server($this->logger);
 
+        $this->tracker = Mockery::mock(Tracker::class);
+
+        $this->server = new Server($this->tracker, $this->logger);
         $this->server->bind($loop, "0.0.0.0:6881");
     }
 
     public function test_announce_without_connect(){
-        $request = new UdpAnnounceRequest();
+        $request = new AnnounceRequest();
         $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
 
-        $onAnnounce = new MockeryCallableMock();
-        $onAnnounce->shouldBeCalled()->never();
-
-        $onResponse = new MockeryCallableMock();
-        $onResponse->shouldBeCalled()->never();
-
-        $onFail = new MockeryCallableMock();
-        $onFail->shouldBeCalled()->once();
-
-        $this->server->on("announce", $onAnnounce);
-        $this->server->announce($request)->then($onResponse, $onFail);
+        $errorResponse = $this->server->acceptMessage(new UdpTransaction('aaa', 'bbb'), $request);
+        $this->assertInstanceOf(TrackerResponse::class, $errorResponse);
     }
 
     public function test_announce(){
@@ -62,26 +64,25 @@ class ServerTest extends \PHPUnit_Framework_TestCase {
         $connectRequest->setConnectionId(hex2bin("0000041727101980"));
         $connectRequest->setTransactionId('aaaa');
 
-        $onConnect = new MockeryCallableMock();
+        $onConnect = new MockeryCallableMock('onConnect');
         $onConnect->shouldBeCalled()->once()->with($this->server, $connectRequest);
 
-        $onResponse = new MockeryCallableMock();
-        $onResponse->shouldBeCalled()->once();
-
         $this->server->on("connect", $onConnect);
-        $this->server->connect($connectRequest)->then(function(UdpConnectionResponse $response) use($onResponse){
-            $this->assertInstanceOf(UdpConnectionResponse::class, $response);
-            $request = new UdpAnnounceRequest();
-            $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
-            $request->setTransactionId('bbbb');
-            $request->setConnectionId($response->getConnectionId());
 
-            $onAnnounce = new MockeryCallableMock();
-            $onAnnounce->shouldBeCalled()->once()->with($this->server, $request, \Mockery::type(Deferred::class));
+        $response = $this->server->connect($connectRequest);
 
-            $this->server->on("announce", $onAnnounce);
-            $this->server->announce($request);
-        })->then($onResponse);
+        $this->assertInstanceOf(UdpConnectionResponse::class, $response);
+        $request = new AnnounceRequest();
+        $request->setRequestEndpoint(Endpoint::fromString("127.0.0.1:80"));
+
+        $udpConnection = new UdpTransaction($response->getConnectionId(), null);
+
+        $announceResponse = new AnnounceResponse($request);
+        $this->tracker->shouldReceive('announce')->andReturn($announceResponse);
+        $this->assertEquals(
+            $announceResponse,
+            $this->server->acceptMessage($udpConnection, $request)
+        );
     }
 }
  

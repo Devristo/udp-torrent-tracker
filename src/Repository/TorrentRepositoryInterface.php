@@ -27,4 +27,6 @@ interface TorrentRepositoryInterface {
      * @return AnnounceRequest|null
      */
     public function getPeer($infoHash, $peerId, $key);
+
+    public function invalidateSessionsByTime($time);
 }

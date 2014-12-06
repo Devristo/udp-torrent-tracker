@@ -13,7 +13,6 @@ use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Message\AuthenticationExtension;
-use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Devristo\TorrentTracker\Message\TrackerResponse;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionRequest;
 use Devristo\TorrentTracker\UdpServer\Message\UdpConnectionResponse;
@@ -28,7 +27,7 @@ class Serializer {
     const PACKET_TYPE_ANNOUNCE = 1;
     const PACKET_TYPE_SCRAPE = 2;
 
-    public function __construct(array $messageFactory){
+    public function __construct(array $messageFactory=null){
         $this->messageFactory = array(
             "announce" => function(){return new AnnounceRequest();},
             "scrape" => function(){return new AnnounceRequest();}
@@ -216,11 +215,11 @@ class Serializer {
     }
 
     public function encodeAnnounce($transactionId, AnnounceResponse $response){
-        $header = pack("NNNNN", 1, $transactionId, $response->getInterval(), $response->getLeechers(), $response->getSeeders());
+        $header = \pack("NNNNN", 1, $transactionId, $response->getInterval(), $response->getLeechers(), $response->getSeeders());
 
         $peerData = '';
         foreach($response->getPeers() as $peer){
-            $peerData .= pack("N", ip2long($peer->getIp())).pack("n", $peer->getPort());
+            $peerData .= \pack("N", ip2long($peer->getIp())).pack("n", $peer->getPort());
         }
 
         return $header.$peerData;

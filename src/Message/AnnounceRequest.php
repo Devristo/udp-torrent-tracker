@@ -111,7 +111,7 @@ class AnnounceRequest extends TrackerRequest{
      */
     public function getIpv4()
     {
-        return $this->ipv4;
+        return $this->ipv4 ? $this->ipv4 : $this->getRequestEndpoint()->getIp();
     }
 
     /**
@@ -191,7 +191,7 @@ class AnnounceRequest extends TrackerRequest{
      */
     public function getPort()
     {
-        return $this->port;
+        return $this->port ? $this->port : $this->getRequestEndpoint()->getPort();
     }
 
     /**

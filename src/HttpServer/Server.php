@@ -25,7 +25,7 @@ use Ratchet\Server\IoServer;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
 
-class Server extends EventEmitter implements ServerInterface{
+class Server extends EventEmitter {
     protected $conversion;
     protected $messageHandlers;
     protected $logger;
@@ -51,27 +51,6 @@ class Server extends EventEmitter implements ServerInterface{
         $this->logger->info("TcpServer bound", array(
             "address" => $address
         ));
-    }
-
-    public function announce(AnnounceRequest $announce)
-    {
-        $deferred = new Deferred();
-
-        if(!$announce->getIpv4())
-            $announce->setIpv4($announce->getRequestEndpoint()->getIp());
-
-        if(!$announce->getPort())
-            $announce->setPort($announce->getRequestEndpoint()->getPort());
-
-        $this->emit("announce", array($this, $announce, $deferred));
-        return $deferred->promise();
-    }
-
-    public function scrape(ScrapeRequest $scrape)
-    {
-        $deferred = new Deferred();
-        $this->emit("scrape", array($this, $scrape, $deferred));
-        return $deferred->promise();
     }
 
     public function acceptMessage(Endpoint $endpoint, Request $request) {

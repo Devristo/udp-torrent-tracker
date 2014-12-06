@@ -50,10 +50,6 @@ class Endpoint {
         $this->port = $port;
     }
 
-    public function toString(){
-        return $this->__toString();
-    }
-
     public function __toString(){
         return sprintf("%s:%d", $this->getIp(), $this->getPort());
     }

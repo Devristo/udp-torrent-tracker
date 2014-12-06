@@ -15,6 +15,7 @@ use Devristo\TorrentTracker\Message\TrackerRequest;
 
 class UdpConnectionRequest extends TrackerRequest{
     protected $connectionId;
+    protected $transactionId;
 
     /**
      * @return mixed
@@ -38,5 +39,21 @@ class UdpConnectionRequest extends TrackerRequest{
     public function getMessageType()
     {
         return 'connect';
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getTransactionId()
+    {
+        return $this->transactionId;
+    }
+
+    /**
+     * @param mixed $transactionId
+     */
+    public function setTransactionId($transactionId)
+    {
+        $this->transactionId = $transactionId;
     }
 }
