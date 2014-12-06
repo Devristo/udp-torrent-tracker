@@ -21,11 +21,11 @@
     ],
     "require": {
         "psr/log": "v1.0.0",
-        "clue/datagram": "0.4.*",
-        "react/react": "<0.4",
+        "clue/datagram": "0.5.*",
+        "react/react": "0.4.*",
         "symfony/routing": "2.4.*",
         "devristo/torrent": "dev-master",
-        "cboden/ratchet": "v0.3.0"
+        "cboden/ratchet": "0.3.*"
     },
     "require-dev": {
         "monolog/monolog": "v1.9.1",
