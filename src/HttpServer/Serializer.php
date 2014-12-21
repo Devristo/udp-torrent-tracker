@@ -6,10 +6,11 @@
  * Time: 09:33
  */
 
-namespace Devristo\TorrentTracker\TcpServer;
+namespace Devristo\TorrentTracker\HttpServer;
 
 
 use Devristo\Torrent\Bee;
+use Devristo\TorrentTracker\Configuration;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Devristo\TorrentTracker\Message\TrackerResponse;
@@ -31,7 +32,7 @@ class Serializer {
     protected $encodeHandlers;
     protected $bee;
 
-    public function __construct(array $messageFactory=null){
+    public function __construct(Configuration $configuration){
         $this->routes = new RouteCollection();
         $this->routes->add('announce', new Route('/announce/{userid}/{token}'));
         $this->routes->add('scrape', new Route('/scrape'));
@@ -39,13 +40,9 @@ class Serializer {
         $this->bee = new Bee();
 
         $this->messageFactory = array(
-            "announce" => function(){return new AnnounceRequest();},
-            "scrape" => function(){return new AnnounceRequest();}
+            "announce" => $configuration->getAnnounceRequestConstructor(),
+            "scrape" => $configuration->getScrapeRequestConstructor()
         );
-
-        if($messageFactory){
-            $this->messageFactory = array_merge($this->messageFactory, $messageFactory);
-        }
 
         $this->decodeHandlers = array(
             "announce" => array($this, 'decodeAnnounce'),
@@ -72,7 +69,7 @@ class Serializer {
      * @param Request $httpRequest
      * @return TrackerRequest
      */
-    public function decode(Request $httpRequest){
+    public function parseRequest(Request $httpRequest){
         $context = new RequestContext();
         $context->setMethod($httpRequest->getMethod());
         $matcher = new UrlMatcher($this->routes, $context);
@@ -102,7 +99,7 @@ class Serializer {
         $announce->setUploaded($query['uploaded']);
         $announce->setDownloaded($query['downloaded']);
         $announce->setLeft($query['left']);
-        $announce->setRequestString($httpRequest->getResource());
+        $announce->setRequestUri($httpRequest->getResource());
 
         $eventKey = $query->hasKey('event') && array_key_exists($query['event'], $eventMap)
             ? $query['event'] : null;

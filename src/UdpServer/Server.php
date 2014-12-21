@@ -11,6 +11,7 @@ namespace Devristo\TorrentTracker\UdpServer;
 
 use Datagram\Factory as DatagramFactory;
 use Datagram\Socket;
+use Devristo\TorrentTracker\Configuration;
 use Devristo\TorrentTracker\Exceptions\TrackerException;
 use Devristo\TorrentTracker\Message\TrackerRequest;
 use Devristo\TorrentTracker\Message\TrackerResponse;
@@ -47,10 +48,10 @@ class Server extends EventEmitter
      */
     protected $_connections = array();
 
-    public function __construct(Tracker $tracker, LoggerInterface $logger){
+    public function __construct(Tracker $tracker, Configuration $configuration, LoggerInterface $logger){
         $this->tracker = $tracker;
         $this->logger = $logger;
-        $this->serializer = new Serializer();
+        $this->serializer = new Serializer($configuration);
     }
 
     public function bind(LoopInterface $eventLoop, $bindAddress="0.0.0.0:6881"){
@@ -146,7 +147,7 @@ class Server extends EventEmitter
 
             $this->logger->error($e->getMessage(), array(
                 'exception' => $e,
-                'address' => $inputPacket->getRequestEndpoint()
+                'address' => $udpConnection->getEndpoint()
             ));
 
             $trackerResponse = new ErrorResponse($e->getRequest(), $e->getMessage());
@@ -156,6 +157,8 @@ class Server extends EventEmitter
     }
 
     public function acceptBuffer($buf, $address) {
+        $endpoint = Endpoint::fromString($address);
+
         try {
             /**
              * @var $connectionId string
@@ -163,11 +166,7 @@ class Server extends EventEmitter
              * @var $inputPacket TrackerRequest
              */
             list($connectionId, $transactionId, $inputPacket) = $this->serializer->decode($buf);
-            $udpConnection = new UdpTransaction($connectionId, $transactionId);
-
-            $endpoint = Endpoint::fromString($address);
-            $inputPacket->setRequestEndpoint($endpoint);
-
+            $udpConnection = new UdpTransaction($endpoint, $connectionId, $transactionId);
             $this->acceptMessage($udpConnection, $inputPacket);
         } catch(\Exception $exception){
             $this->logger->error('Unhandled exception', array(
@@ -176,11 +175,15 @@ class Server extends EventEmitter
             ));
 
             $this->emit("exception", array($this, $exception));
+
+            $trackerResponse = new ErrorResponse(null, $exception->getMessage());
+            $this->send(new UdpTransaction($endpoint, 0, 0), $trackerResponse);
+            return $trackerResponse;
         }
     }
 
     protected function send(UdpTransaction $connection, TrackerResponse $response){
-        $address = (string)  $response->getRequest()->getRequestEndpoint();
+        $address = (string) $connection->getEndpoint();
 
         $buff = $this->serializer->encode($connection->getTransactionId(), $response);
         $this->socket->send($buff, $address);

@@ -10,6 +10,7 @@ namespace Devristo\TorrentTracker;
 
 
 use Akamon\MockeryCallableMock\MockeryCallableMock;
+use Devristo\TorrentTracker\Event\TrackerEvent;
 use Devristo\TorrentTracker\Exceptions\TrackerException;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;

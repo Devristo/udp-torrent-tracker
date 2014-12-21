@@ -17,7 +17,7 @@ $server->getEventManager()->attach("announce", function(\Zend\EventManager\Event
 
     # Use your own code to find the torrent and the user    
     $torrent = getFromInfoHash($request->getInfoHash());
-    $user = getUserFromPasskey($request->getRequestString());
+    $user = getUserFromPasskey($request->getRequestUri());
     
     # And your own code to check if the user may download
     if(!$user->mayDownload($torrent)){

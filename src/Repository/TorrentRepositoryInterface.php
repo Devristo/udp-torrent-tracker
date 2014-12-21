@@ -9,7 +9,7 @@
 namespace Devristo\TorrentTracker\Repository;
 
 use Devristo\TorrentTracker\Message\AnnounceRequest;
-use Devristo\TorrentTracker\Model\TorrentInterface;
+use Devristo\TorrentTracker\Message\AnnounceRequestInterface;
 
 interface TorrentRepositoryInterface {
     /**
@@ -18,7 +18,7 @@ interface TorrentRepositoryInterface {
      */
     public function getPeers($infoHash);
 
-    public function updatePeer($infoHash, $peerId, $key, AnnounceRequest $request);
+    public function updatePeer($infoHash, $peerId, AnnounceRequestInterface $request);
 
     /**
      * @param $infoHash
@@ -26,7 +26,7 @@ interface TorrentRepositoryInterface {
      * @param $key
      * @return AnnounceRequest|null
      */
-    public function getPeer($infoHash, $peerId, $key);
+    public function getPeer($infoHash, $peerId);
 
-    public function invalidateSessionsByTime($time);
+    public function invalidateSessionsByTime();
 }

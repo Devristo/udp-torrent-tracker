@@ -9,15 +9,17 @@
 namespace Devristo\TorrentTracker\TcpServer;
 
 
+use Devristo\TorrentTracker\Configuration;
 use Devristo\TorrentTracker\Exceptions\TrackerException;
-use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\HttpServer\Serializer;
+use Devristo\TorrentTracker\Message\AnnounceRequestInterface;
 use Devristo\TorrentTracker\Message\TrackerResponse;
 use Devristo\TorrentTracker\Message\ErrorResponse;
-use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Devristo\TorrentTracker\Model\Endpoint;
-use Devristo\TorrentTracker\ServerInterface;
+use Devristo\TorrentTracker\Tracker;
 use Evenement\EventEmitter;
 use Guzzle\Http\Message\Request;
+use Psr\Log\InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\Http\HttpServer;
@@ -30,14 +32,10 @@ class Server extends EventEmitter {
     protected $messageHandlers;
     protected $logger;
 
-    public function __construct(LoggerInterface $logger, array $messageFactory=null){
+    public function __construct(Tracker $tracker, LoggerInterface $logger, Configuration $configuration){
         $this->logger = $logger;
-        $this->conversion = new Serializer($messageFactory);
-
-        $this->messageHandlers = array(
-            "announce" => array($this, 'announce'),
-            "scrape" => array($this, 'scrape')
-        );
+        $this->conversion = new Serializer($configuration);
+        $this->tracker = $tracker;
     }
 
     public function bind(LoopInterface $eventLoop, $address="0.0.0.0:6881")
@@ -55,10 +53,13 @@ class Server extends EventEmitter {
 
     public function acceptMessage(Endpoint $endpoint, Request $request) {
         try {
-            $request = $this->conversion->decode($request);
+            $request = $this->conversion->parseRequest($request);
             $request->setRequestEndpoint($endpoint);
-            $handler = $this->messageHandlers[$request->getMessageType()];
-            $promise = call_user_func($handler, $request);
+
+            if($request instanceof AnnounceRequestInterface)
+                return $this->tracker->announce($request);
+            else throw new InvalidArgumentException();
+
         } catch (\Exception $e){
             $this->logger->error("Cannot handle request", array(
                 'exception' => $e

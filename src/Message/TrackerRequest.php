@@ -10,32 +10,9 @@
 namespace Devristo\TorrentTracker\Message;
 
 
-use Devristo\TorrentTracker\Model\Endpoint;
-
-abstract class TrackerRequest
+interface TrackerRequest
 {
     const MESSAGE_TYPE_CONNECT = "connect";
     const MESSAGE_TYPE_ANNOUNCE = "announce";
     const MESSAGE_TYPE_SCRAPE = "scrape";
-
-    protected $requestEndpoint;
-
-
-    /**
-     * @return mixed
-     */
-    abstract public function getMessageType();
-
-    public function setRequestEndpoint(Endpoint $endpoint)
-    {
-        $this->requestEndpoint = $endpoint;
-    }
-
-    /**
-     * @return Endpoint
-     */
-    public function getRequestEndpoint(){
-        return $this->requestEndpoint;
-    }
-
 }

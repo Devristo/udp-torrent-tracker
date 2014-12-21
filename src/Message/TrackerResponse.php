@@ -12,7 +12,7 @@ namespace Devristo\TorrentTracker\Message;
 abstract class TrackerResponse {
     protected $request;
 
-    public function __construct(TrackerRequest $request=null)
+    public function __construct($request=null)
     {
         $this->request = $request;
     }

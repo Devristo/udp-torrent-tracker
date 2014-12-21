@@ -10,6 +10,7 @@ namespace Devristo\TorrentTracker\Repository;
 
 
 use Devristo\TorrentTracker\Message\AnnounceRequest;
+use Devristo\TorrentTracker\Message\AnnounceRequestInterface;
 use Devristo\TorrentTracker\Model\TorrentInterface;
 use Psr\Log\LoggerInterface;
 
@@ -45,7 +46,7 @@ class ArrayRepository implements TorrentRepositoryInterface
         return $this->peers[$infohash];
     }
 
-    public function updatePeer($infoHash, $peerId, $key, AnnounceRequest $request)
+    public function updatePeer($infoHash, $peerId, $key, AnnounceRequestInterface $request)
     {
         $compositeKey = $peerId.$key;
 

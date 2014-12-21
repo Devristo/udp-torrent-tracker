@@ -10,7 +10,7 @@ use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\ScrapeRequest;
 use Devristo\TorrentTracker\Model\AnnounceDifference;
 use Devristo\TorrentTracker\Repository\ArrayRepository;
-use Devristo\TorrentTracker\TrackerEvent;
+use Devristo\TorrentTracker\Event\TrackerEvent;
 use Devristo\TorrentTracker\UdpServer\Server as UdpServer;
 use Devristo\TorrentTracker\TcpServer\Server as TcpServer;
 use Devristo\TorrentTracker\Tracker;
@@ -30,7 +30,7 @@ $udpServer->bind($loop, "0.0.0.0:6881");
 $tracker->on('announce', function(TrackerEvent $event, AnnounceRequest $request, AnnounceDifference $diff) use($logger){
     $logger->warning("New announce received", array(
         'client' => bin2hex($request->getPeerId()),
-        'url' => $request->getRequestString(),
+        'url' => $request->getRequestUri(),
         'dDown' => $diff->getDownloaded(),
         'dUp' => $diff->getUploaded()
     ));

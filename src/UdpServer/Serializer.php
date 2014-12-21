@@ -9,6 +9,7 @@
 namespace Devristo\TorrentTracker\UdpServer;
 
 
+use Devristo\TorrentTracker\Configuration;
 use Devristo\TorrentTracker\Exceptions\ProtocolViolationException;
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
@@ -27,15 +28,11 @@ class Serializer {
     const PACKET_TYPE_ANNOUNCE = 1;
     const PACKET_TYPE_SCRAPE = 2;
 
-    public function __construct(array $messageFactory=null){
+    public function __construct(Configuration $configuration){
         $this->messageFactory = array(
-            "announce" => function(){return new AnnounceRequest();},
-            "scrape" => function(){return new AnnounceRequest();}
+            "announce" => $configuration->getAnnounceRequestConstructor(),
+            "scrape" => $configuration->getScrapeRequestConstructor()
         );
-
-        if($messageFactory){
-            $this->messageFactory = array_merge($this->messageFactory, $messageFactory);
-        }
     }
 
     /**

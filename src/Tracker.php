@@ -8,87 +8,70 @@
 
 namespace Devristo\TorrentTracker;
 
-use Devristo\TorrentTracker\Exceptions\TrackerException;
+use Devristo\TorrentTracker\Event\AnnounceEvent;
+use Devristo\TorrentTracker\Event\PostAnnounceEvent;
+use Devristo\TorrentTracker\Message\AnnounceRequestInterface;
+use Devristo\TorrentTracker\Message\ErrorResponse;
 use Devristo\TorrentTracker\Model\AnnounceDifference;
 use Devristo\TorrentTracker\Model\SwarmPeer;
 use Devristo\TorrentTracker\Repository\TorrentRepositoryInterface;
-use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Evenement\EventEmitter;
-use Psr\Log\LoggerInterface;
-use React\EventLoop\LoopInterface;
-use React\Promise\Deferred;
 
 class Tracker extends EventEmitter{
-    protected $maxAnnouncePeers;
     protected $invalidationFactor = 3;
     protected $announceInterval = 60;
     protected $lastInvalidate = 0;
+    protected $configuration;
 
-    /**
-     * @return mixed
-     */
-    public function getMaxAnnouncePeers()
-    {
-        return $this->maxAnnouncePeers;
-    }
 
-    /**
-     * @param mixed $maxAnnouncePeers
-     */
-    public function setMaxAnnouncePeers($maxAnnouncePeers)
-    {
-        $this->maxAnnouncePeers = $maxAnnouncePeers;
-    }
-
-    public function __construct(TorrentRepositoryInterface $repository){
+    public function __construct(TorrentRepositoryInterface $repository, Configuration $config){
         $this->torrentRepository = $repository;
-        $this->invalidateSessions();
+        $this->configuration = $config;
+        $this->torrentRepository->invalidateSessionsByTime();
     }
 
-    public function invalidateSessions(){
-        $sessionTimeout = $this->invalidationFactor * $this->announceInterval;
 
-        if($this->lastInvalidate + $sessionTimeout < time()) {
-            $time = time() - $sessionTimeout;
-            $this->torrentRepository->invalidateSessionsByTime($time);
-
-            $this->lastInvalidate = time();
-        }
-    }
-
-    public function announce(AnnounceRequest $trackerRequest){
-        $this->invalidateSessions();
+    public function announce(AnnounceRequestInterface $trackerRequest){
+        $this->torrentRepository->invalidateSessionsByTime();
 
         $infoHash = $trackerRequest->getInfoHash();
 
+        $trackerRequest->setAnnounceTime(new \DateTime());
+        $trackerRequest->setExpirationTime((new \DateTime())->add(new \DateInterval("PT1200S")));
+
         $diff = $this->getAnnounceDiff($trackerRequest);
 
-        $eventObject = new TrackerEvent();
-        $this->emit("announce", array($eventObject, $trackerRequest, $diff));
+        if($diff->getUploaded())
+            $trackerRequest->setUploadSpeed($diff->getUploaded() / $diff->getSeconds());
+
+        if($diff->getDownloaded())
+            $trackerRequest->setUploadSpeed($diff->getDownloaded() / $diff->getSeconds());
+
+        $eventObject = new AnnounceEvent($trackerRequest, $diff);
+        $this->emit("preAnnounce", array($eventObject));
         if ($eventObject->isCanceled()) {
-            throw new TrackerException($trackerRequest, $eventObject->getError());
+            return new ErrorResponse($trackerRequest, $eventObject->getCancellationReason());
         }
 
         try {
             $this->torrentRepository->updatePeer(
                 $trackerRequest->getInfoHash(),
                 $trackerRequest->getPeerId(),
-                $trackerRequest->getKey(),
                 $trackerRequest
             );
 
             $peers = $this->torrentRepository->getPeers($infoHash);
 
-            $peersWithoutSelf = array_filter($peers, function(AnnounceRequest $peer) use ($trackerRequest){
+            $peersWithoutSelf = array_filter($peers, function(AnnounceRequestInterface $peer) use ($trackerRequest){
                 return !(
                     $peer->getPeerId() == $trackerRequest->getPeerId()
                     && $peer->getKey() == $trackerRequest->getKey()
                 );
             });
 
-            $seeders = array_filter($peersWithoutSelf, function(AnnounceRequest $peer){return $peer->getLeft() == 0;});
-            $leechers = array_filter($peersWithoutSelf, function(AnnounceRequest $peer){return $peer->getLeft() != 0;});
+            $seeders = array_filter($peersWithoutSelf, function(AnnounceRequestInterface $peer){return $peer->getLeft() == 0;});
+            $leechers = array_filter($peersWithoutSelf, function(AnnounceRequestInterface $peer){return $peer->getLeft() != 0;});
 
             $numSeeders = count($seeders);
             $numLeechers = count($leechers);
@@ -105,10 +88,10 @@ class Tracker extends EventEmitter{
             }
 
             // Return a subset of peers
-            $numPeers = min(min(count($peers), $trackerRequest->getNumWant()), $this->getMaxAnnouncePeers());
+            $numPeers = min(min(count($peers), $trackerRequest->getNumWant()), $this->configuration->getMaxAnnouncePeers());
             $peers = array_slice($peers, 0, $numPeers);
 
-            $peers = array_map(function(AnnounceRequest $request){
+            $peers = array_map(function(AnnounceRequestInterface $request){
                 return new SwarmPeer($request->getIpv4(), $request->getPort());
             }, $peers);
 
@@ -117,22 +100,28 @@ class Tracker extends EventEmitter{
             $response->setSeeders($numSeeders);
             $response->setPeers($peers);
 
-            return $response;
+            $postAnnounceEvent = new PostAnnounceEvent($trackerRequest, $diff, $response);
+            $this->emit("postAnnounce", array($postAnnounceEvent));
+
+            if(!$postAnnounceEvent->isCanceled())
+                return $response;
+            else return new ErrorResponse($trackerRequest, $postAnnounceEvent->getCancellationReason());
+
         } catch (\Exception $e) {
-            throw new TrackerException($trackerRequest, "Error =( contact crew please");
+            error_log($e);
+            return new ErrorResponse($trackerRequest, "Error =( contact crew please");
         }
     }
 
     /**
-     * @param AnnounceRequest $trackerRequest
+     * @param AnnounceRequestInterface $trackerRequest
      * @return AnnounceDifference|static
      */
-    protected function getAnnounceDiff(AnnounceRequest $trackerRequest)
+    protected function getAnnounceDiff(AnnounceRequestInterface $trackerRequest)
     {
         $previousAnnounce = $this->torrentRepository->getPeer(
             $trackerRequest->getInfoHash(),
-            $trackerRequest->getPeerId(),
-            $trackerRequest->getKey()
+            $trackerRequest->getPeerId()
         );
 
         $diff = $previousAnnounce

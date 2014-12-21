@@ -10,7 +10,7 @@ require_once __DIR__.'/../vendor/autoload.php';
 
 use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Repository\ArrayRepository;
-use Devristo\TorrentTracker\TcpServer\Serializer;
+use Devristo\TorrentTracker\HttpServer\Serializer;
 use Devristo\TorrentTracker\Tracker;
 use Guzzle\Http\Message\Request;
 
@@ -20,7 +20,7 @@ $tracker = new Tracker($repository);
 $httpRequest = new Request($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI'], apache_request_headers());
 $serializer = new Serializer();
 
-$trackerRequest = $serializer->decode($httpRequest);
+$trackerRequest = $serializer->parseRequest($httpRequest);
 if($trackerRequest instanceof AnnounceRequest)
     $response = $tracker->announce($trackerRequest);
 else
