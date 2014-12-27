@@ -20,7 +20,7 @@ use Evenement\EventEmitter;
 
 class Tracker extends EventEmitter{
     protected $invalidationFactor = 3;
-    protected $announceInterval = 60;
+    protected $announceInterval = 600;
     protected $lastInvalidate = 0;
     protected $configuration;
 
@@ -37,8 +37,9 @@ class Tracker extends EventEmitter{
 
         $infoHash = $trackerRequest->getInfoHash();
 
+        $expirationTime = $this->announceInterval * $this->invalidationFactor;
         $trackerRequest->setAnnounceTime(new \DateTime());
-        $trackerRequest->setExpirationTime((new \DateTime())->add(new \DateInterval("PT1200S")));
+        $trackerRequest->setExpirationTime((new \DateTime())->add(new \DateInterval("PT{$expirationTime}S")));
 
         $diff = $this->getAnnounceDiff($trackerRequest);
 
@@ -99,6 +100,7 @@ class Tracker extends EventEmitter{
             $response->setLeechers($numLeechers);
             $response->setSeeders($numSeeders);
             $response->setPeers($peers);
+            $response->setInterval($this->announceInterval);
 
             $postAnnounceEvent = new PostAnnounceEvent($trackerRequest, $diff, $response);
             $this->emit("postAnnounce", array($postAnnounceEvent));
