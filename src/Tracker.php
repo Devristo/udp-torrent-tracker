@@ -127,8 +127,8 @@ class Tracker extends EventEmitter{
         );
 
         $diff = $previousAnnounce
-            ? AnnounceDifference::diff($previousAnnounce, $trackerRequest)
-            : new AnnounceDifference();
+            ? new AnnounceDifference($trackerRequest, $previousAnnounce)
+            : new AnnounceDifference($trackerRequest);
         return $diff;
     }
 } 

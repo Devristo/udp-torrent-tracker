@@ -15,11 +15,24 @@ class AnnounceDifference
 {
     protected $downloaded;
     protected $uploaded;
+    protected $time;
 
-    public function __construct($downloaded=0, $uploaded=0, $time=0){
-        $this->downloaded = $downloaded;
-        $this->uploaded = $uploaded;
-        $this->time = $time;
+    protected $currentRequest;
+    protected $previousRequest;
+
+    public function __construct(AnnounceRequestInterface $currentRequest, AnnounceRequestInterface $previousRequest=null){
+        $this->currentRequest = $currentRequest;
+        $this->previousRequest = $previousRequest;
+
+        $this->downloaded = 0;
+        $this->uploaded = 0;
+        $this->time = 0;
+
+        if($previousRequest) {
+            $this->downloaded = max(0, $currentRequest->getDownloaded() - $previousRequest->getDownloaded());
+            $this->uploaded = max(0, $currentRequest->getUploaded() - $previousRequest->getUploaded());
+            $this->time = $currentRequest->getAnnounceTime()->getTimestamp() - $previousRequest->getAnnounceTime()->getTimestamp();
+        }
     }
 
     public function getDownloaded(){
@@ -34,11 +47,19 @@ class AnnounceDifference
         return $this->time;
     }
 
-    public static function diff(AnnounceRequestInterface $prev, AnnounceRequestInterface $current){
-        $downloaded = max(0, $current->getDownloaded() - $prev->getDownloaded());
-        $uploaded = max(0, $current->getUploaded() - $prev->getUploaded());
-        $time = $current->getAnnounceTime()->getTimestamp() - $prev->getAnnounceTime()->getTimestamp();
+    /**
+     * @return AnnounceRequestInterface
+     */
+    public function getCurrentRequest()
+    {
+        return $this->currentRequest;
+    }
 
-        return new static($downloaded, $uploaded, $time);
+    /**
+     * @return AnnounceRequestInterface
+     */
+    public function getPreviousRequest()
+    {
+        return $this->previousRequest;
     }
 } 
