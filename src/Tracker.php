@@ -19,25 +19,22 @@ use Devristo\TorrentTracker\Message\AnnounceResponse;
 use Evenement\EventEmitter;
 
 class Tracker extends EventEmitter{
-    protected $invalidationFactor = 3;
-    protected $announceInterval = 600;
     protected $lastInvalidate = 0;
     protected $configuration;
-
-
+    protected $torrentRepository;
+    
     public function __construct(TorrentRepositoryInterface $repository, Configuration $config){
         $this->torrentRepository = $repository;
         $this->configuration = $config;
         $this->torrentRepository->invalidateSessionsByTime();
     }
 
-
     public function announce(AnnounceRequestInterface $trackerRequest){
         $this->torrentRepository->invalidateSessionsByTime();
 
         $infoHash = $trackerRequest->getInfoHash();
 
-        $expirationTime = $this->announceInterval * $this->invalidationFactor;
+        $expirationTime = $this->configuration->getAnnounceInterval() * $this->configuration->getInvalidationFactor();
         $trackerRequest->setAnnounceTime(new \DateTime());
         $trackerRequest->setExpirationTime((new \DateTime())->add(new \DateInterval("PT{$expirationTime}S")));
 
@@ -100,7 +97,7 @@ class Tracker extends EventEmitter{
             $response->setLeechers($numLeechers);
             $response->setSeeders($numSeeders);
             $response->setPeers($peers);
-            $response->setInterval($this->announceInterval);
+            $response->setInterval($this->configuration->getAnnounceInterval());
 
             $postAnnounceEvent = new PostAnnounceEvent($trackerRequest, $diff, $response);
             $this->emit("postAnnounce", array($postAnnounceEvent));

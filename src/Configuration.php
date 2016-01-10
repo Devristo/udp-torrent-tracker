@@ -13,6 +13,19 @@ use Devristo\TorrentTracker\Message\AnnounceRequest;
 use Devristo\TorrentTracker\Message\ScrapeRequest;
 
 class Configuration {
+
+    /**
+     * The announce interval in seconds
+     * @var int
+     */
+    protected $announceInterval;
+
+    /**
+     * The invalidation factor
+     * @var int
+     */
+    protected $invalidationFactor;
+
     /**
      * @var callable
      */
@@ -84,5 +97,41 @@ class Configuration {
     public function setMaxAnnouncePeers($maxAnnouncePeers)
     {
         $this->maxAnnouncePeers = $maxAnnouncePeers;
+    }
+
+    /**
+     * @return int
+     */
+    public function getAnnounceInterval()
+    {
+        return $this->announceInterval;
+    }
+
+    /**
+     * @param int $announceInterval
+     * @return Configuration
+     */
+    public function setAnnounceInterval($announceInterval)
+    {
+        $this->announceInterval = $announceInterval;
+        return $this;
+    }
+
+    /**
+     * @return int
+     */
+    public function getInvalidationFactor()
+    {
+        return $this->invalidationFactor;
+    }
+
+    /**
+     * @param int $invalidationFactor
+     * @return Configuration
+     */
+    public function setInvalidationFactor($invalidationFactor)
+    {
+        $this->invalidationFactor = $invalidationFactor;
+        return $this;
     }
 }
